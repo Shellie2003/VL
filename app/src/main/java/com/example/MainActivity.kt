@@ -1,10 +1,14 @@
 package com.example
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
+import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,10 +30,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.example.cutpilot.model.MainNavigationTab
 import com.example.cutpilot.ui.components.BottomNavBar
 import com.example.cutpilot.ui.components.TopStudioBar
@@ -45,14 +52,17 @@ import com.example.cutpilot.viewmodel.CutPilotViewModel
 
 class MainActivity : ComponentActivity() {
 
+    private val vm: CutPilotViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (savedInstanceState == null) handlePairingIntent(intent)
 
         setContent {
             CutPilotTheme {
-                val vm: CutPilotViewModel = viewModel()
                 val settings by vm.settings.collectAsStateWithLifecycle()
+                val context = LocalContext.current
 
                 // Keep screen awake for video editing sessions
                 LaunchedEffect(settings.keepScreenAwake) {
@@ -63,10 +73,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // One-shot messages from the ViewModel
+                LaunchedEffect(Unit) {
+                    vm.userMessages.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+                }
+
                 // Bluetooth permissions on Android 12+
                 val permissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions()
-                ) { /* Permissions result handled gracefully by HID manager */ }
+                ) { vm.onBluetoothPermissionsResult() }
 
                 LaunchedEffect(Unit) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -84,14 +99,62 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                CutPilotApp(vm)
+                // QR code scanner (handles the camera permission itself)
+                val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+                    result.contents?.let { vm.handlePairingPayload(it) }
+                }
+                val scanQr: () -> Unit = {
+                    scanLauncher.launch(
+                        ScanOptions()
+                            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                            .setPrompt("Visez le QR code affiché par Vôlavo Hôte")
+                            .setBeepEnabled(false)
+                            .setOrientationLocked(false)
+                    )
+                }
+
+                // Make the phone discoverable so the computer can find "Vôlavo Mouse & Deck"
+                val discoverableLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { }
+                val makeDiscoverable: () -> Unit = {
+                    try {
+                        discoverableLauncher.launch(
+                            Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+                                .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120)
+                        )
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Bluetooth indisponible", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                CutPilotApp(vm, onScanQr = scanQr, onMakeDiscoverable = makeDiscoverable)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePairingIntent(intent)
+    }
+
+    /** `volavo://pair?...` links: scanning the QR code with the system camera opens the app. */
+    private fun handlePairingIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme.equals("volavo", ignoreCase = true)) {
+            vm.handlePairingPayload(data.toString())
+            vm.selectTab(MainNavigationTab.CONNECTION)
         }
     }
 }
 
 @Composable
-fun CutPilotApp(vm: CutPilotViewModel) {
+fun CutPilotApp(
+    vm: CutPilotViewModel,
+    onScanQr: () -> Unit = {},
+    onMakeDiscoverable: () -> Unit = {}
+) {
     val currentTab by vm.currentTab.collectAsStateWithLifecycle()
     val connectionMode by vm.connectionMode.collectAsStateWithLifecycle()
     val connectionStatus by vm.connectionStatus.collectAsStateWithLifecycle()
@@ -101,7 +164,8 @@ fun CutPilotApp(vm: CutPilotViewModel) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val profiles by vm.profiles.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
-    val simState by vm.simState.collectAsStateWithLifecycle()
+    // simState is collected inside the screens that use it, so frequent timeline
+    // updates only recompose the visible screen, not the whole app shell.
 
     // BackHandler returns to Trackpad from any other tab
     BackHandler(enabled = currentTab != MainNavigationTab.TRACKPAD) {
@@ -146,13 +210,18 @@ fun CutPilotApp(vm: CutPilotViewModel) {
             ) { targetTab ->
                 when (targetTab) {
                     MainNavigationTab.TRACKPAD -> {
+                        val simState by vm.simState.collectAsStateWithLifecycle()
+                        val dragLocked by vm.dragLocked.collectAsStateWithLifecycle()
                         TrackpadScreen(
                             settings = settings,
                             isPlaying = simState.isPlaying,
                             activeProfileName = activeProfile.name,
-                            onMouseMove = { dx, dy -> vm.onMouseMove(dx, dy) },
-                            onMouseClick = { btn -> vm.onMouseClick(btn) },
-                            onScroll = { dy, dx -> vm.onScroll(dy, dx) },
+                            isDragLocked = dragLocked,
+                            onMouseMove = vm::onMouseMove,
+                            onMouseClick = vm::onMouseClick,
+                            onMouseButton = vm::onMouseButton,
+                            onToggleDragLock = { vm.setDragLock(!dragLocked) },
+                            onScroll = vm::onScroll,
                             onTogglePlayPause = { vm.togglePlayPause() },
                             onQuickCut = {
                                 activeProfile.shortcuts.find { it.label.contains("Cutter") || it.label.contains("Blade") || it.label.contains("Diviser") }?.let {
@@ -179,6 +248,7 @@ fun CutPilotApp(vm: CutPilotViewModel) {
                     }
 
                     MainNavigationTab.JOG_WHEEL -> {
+                        val simState by vm.simState.collectAsStateWithLifecycle()
                         JogWheelScreen(
                             currentFrame = simState.currentFrame,
                             totalFrames = simState.totalFrames,
@@ -209,6 +279,7 @@ fun CutPilotApp(vm: CutPilotViewModel) {
                     }
 
                     MainNavigationTab.CANVA -> {
+                        val simState by vm.simState.collectAsStateWithLifecycle()
                         CanvaStudioScreen(
                             isPlaying = simState.isPlaying,
                             onTriggerKey = { mods, key -> vm.triggerKeyDirect(mods, key) },
@@ -228,16 +299,26 @@ fun CutPilotApp(vm: CutPilotViewModel) {
                     }
 
                     MainNavigationTab.CONNECTION -> {
+                        val simState by vm.simState.collectAsStateWithLifecycle()
+                        val pairedHost by vm.pairedHost.collectAsStateWithLifecycle()
+                        val connectionError by vm.connectionError.collectAsStateWithLifecycle()
+                        val localIp = remember { vm.getLocalWifiIp() }
                         HostCompanionScreen(
                             connectionMode = connectionMode,
                             connectionStatus = connectionStatus,
                             connectedDeviceName = connectedDeviceName,
                             latencyInfo = latencyInfo,
                             simState = simState,
-                            localWifiIp = vm.getLocalWifiIp(),
-                            pythonServerCode = vm.getPythonServerScript(),
+                            localWifiIp = localIp,
+                            pairedHost = pairedHost,
+                            connectionError = connectionError,
                             onSelectConnectionMode = { vm.setConnectionMode(it) },
-                            onConfigureWifiTarget = { vm.setTargetWifiIp(it) }
+                            onScanQr = onScanQr,
+                            onManualConnect = { ip, code -> vm.connectManual(ip, code) },
+                            onReconnect = { vm.reconnect() },
+                            onDisconnect = { vm.disconnect() },
+                            onForgetPairing = { vm.forgetPairing() },
+                            onMakeDiscoverable = onMakeDiscoverable
                         )
                     }
 

@@ -5,8 +5,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +56,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,8 +81,11 @@ fun TrackpadScreen(
     settings: ControllerSettings,
     isPlaying: Boolean,
     activeProfileName: String,
-    onMouseMove: (Float, Float) -> Unit,
+    isDragLocked: Boolean,
+    onMouseMove: (Float, Float, Long) -> Unit,
     onMouseClick: (Int) -> Unit,
+    onMouseButton: (Int, Boolean) -> Unit,
+    onToggleDragLock: () -> Unit,
     onScroll: (Float, Float) -> Unit,
     onTogglePlayPause: () -> Unit,
     onQuickCut: () -> Unit,
@@ -88,10 +95,16 @@ fun TrackpadScreen(
     onUpdateSensitivity: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var touchPos by remember { mutableStateOf<Offset?>(null) }
-    var isDragging by remember { mutableStateOf(false) }
-    var isDragLocked by remember { mutableStateOf(false) }
-    var showSensitivitySlider by remember { mutableStateOf(false) }
+    // touchPos is only read inside the Canvas draw lambda: moving a finger invalidates the
+    // drawing, never the composition. isTouching flips only at gesture start / end.
+    val touchPos = remember { mutableStateOf<Offset?>(null) }
+    var isTouching by remember { mutableStateOf(false) }
+
+    val currentSettings by rememberUpdatedState(settings)
+    val moveCb by rememberUpdatedState(onMouseMove)
+    val clickCb by rememberUpdatedState(onMouseClick)
+    val buttonCb by rememberUpdatedState(onMouseButton)
+    val scrollCb by rememberUpdatedState(onScroll)
 
     Column(
         modifier = modifier
@@ -219,47 +232,104 @@ fun TrackpadScreen(
                         if (settings.sniperMode) NeonCyan.copy(alpha = 0.6f) else SurfaceContainerHighDark,
                         RoundedCornerShape(16.dp)
                     )
-                    .pointerInput(settings) {
-                        detectTapGestures(
-                            onTap = { offset ->
-                                touchPos = offset
-                                onMouseClick(HidConstants.MOUSE_BUTTON_LEFT)
-                            },
-                            onDoubleTap = { offset ->
-                                touchPos = offset
-                                onMouseClick(HidConstants.MOUSE_BUTTON_LEFT)
-                                onMouseClick(HidConstants.MOUSE_BUTTON_LEFT)
-                            },
-                            onLongPress = { offset ->
-                                touchPos = offset
-                                onMouseClick(HidConstants.MOUSE_BUTTON_RIGHT)
+                    .pointerInput(Unit) {
+                        val slop = viewConfiguration.touchSlop
+                        var lastTapUp = 0L
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val t0 = down.uptimeMillis
+                            var lastT = t0
+                            var maxPointers = 1
+                            var moved = false
+                            var travel = 0f
+                            var pendingX = 0f
+                            var pendingY = 0f
+                            // Tap then touch-and-slide = drag (like a laptop touchpad).
+                            val tapAndDrag = currentSettings.tapToClick && t0 - lastTapUp < 280
+                            var dragging = false
+                            touchPos.value = down.position
+                            isTouching = true
+
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                var pressed = 0
+                                for (c in event.changes) if (c.pressed) pressed++
+                                val now = event.changes[0].uptimeMillis
+                                if (pressed == 0) {
+                                    lastT = now
+                                    break
+                                }
+                                if (pressed > maxPointers) maxPointers = pressed
+                                val dt = (now - lastT).coerceAtLeast(1L)
+                                lastT = now
+
+                                if (maxPointers == 1) {
+                                    val c = event.changes.firstOrNull { it.pressed } ?: break
+                                    val d = c.positionChange()
+                                    if (!moved) {
+                                        travel += d.getDistance()
+                                        pendingX += d.x
+                                        pendingY += d.y
+                                        if (travel > slop) {
+                                            moved = true
+                                            if (tapAndDrag) {
+                                                dragging = true
+                                                buttonCb(HidConstants.MOUSE_BUTTON_LEFT, true)
+                                            }
+                                            // Replay the motion consumed by the slop: nothing is lost.
+                                            moveCb(pendingX, pendingY, dt)
+                                        }
+                                    } else if (d.x != 0f || d.y != 0f) {
+                                        moveCb(d.x, d.y, dt)
+                                    }
+                                    touchPos.value = c.position
+                                } else if (pressed >= 2) {
+                                    // Two fingers: scroll (vertical + horizontal).
+                                    var sx = 0f
+                                    var sy = 0f
+                                    var n = 0
+                                    for (c in event.changes) {
+                                        if (c.pressed && c.previousPressed) {
+                                            val d = c.positionChange()
+                                            sx += d.x
+                                            sy += d.y
+                                            n++
+                                        }
+                                    }
+                                    if (n > 0) {
+                                        val ax = sx / n
+                                        val ay = sy / n
+                                        if (!moved) {
+                                            travel += kotlin.math.hypot(ax, ay)
+                                            if (travel > slop) moved = true
+                                        }
+                                        if (moved) scrollCb(ay, ax)
+                                    }
+                                }
+                                event.changes.forEach { it.consume() }
                             }
-                        )
-                    }
-                    .pointerInput(settings) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                touchPos = offset
-                                isDragging = true
-                            },
-                            onDragEnd = {
-                                touchPos = null
-                                isDragging = false
-                            },
-                            onDragCancel = {
-                                touchPos = null
-                                isDragging = false
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                touchPos = change.position
-                                onMouseMove(dragAmount.x, dragAmount.y)
+
+                            if (dragging) {
+                                buttonCb(HidConstants.MOUSE_BUTTON_LEFT, false)
+                            } else if (!moved) {
+                                val duration = lastT - t0
+                                when {
+                                    maxPointers >= 3 -> clickCb(HidConstants.MOUSE_BUTTON_MIDDLE)
+                                    maxPointers == 2 -> clickCb(HidConstants.MOUSE_BUTTON_RIGHT)
+                                    duration >= 500 -> clickCb(HidConstants.MOUSE_BUTTON_RIGHT)
+                                    currentSettings.tapToClick -> {
+                                        clickCb(HidConstants.MOUSE_BUTTON_LEFT)
+                                        lastTapUp = lastT
+                                    }
+                                }
                             }
-                        )
+                            touchPos.value = null
+                            isTouching = false
+                        }
                     }
                     .testTag("touchpad_surface")
             ) {
-                // Precision grid and crosshair canvas
+                // Static precision grid (reads no state: drawn once, never invalidated)
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val w = size.width
                     val h = size.height
@@ -293,8 +363,11 @@ fun TrackpadScreen(
                         y += gridSpacing
                     }
 
-                    // Draw touch position indicator
-                    touchPos?.let { pos ->
+                }
+
+                // Touch crosshair: only this layer is redrawn while the finger moves
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    touchPos.value?.let { pos ->
                         // Crosshair rings
                         drawCircle(
                             color = if (settings.sniperMode) NeonCyan else AmberAccent,
@@ -344,7 +417,7 @@ fun TrackpadScreen(
                 }
 
                 // Center guide label
-                if (touchPos == null) {
+                if (!isTouching) {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -357,12 +430,12 @@ fun TrackpadScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Glisser pour déplacer le curseur • Taper pour cliquer",
+                            text = "1 doigt : curseur • Tap : clic • Tap + glisser : déplacer",
                             color = TextTertiary,
                             fontSize = 11.sp
                         )
                         Text(
-                            text = "Appui long = Clic droit contextuel",
+                            text = "2 doigts : défiler / clic droit • 3 doigts : clic milieu",
                             color = TextTertiary,
                             fontSize = 10.sp
                         )
@@ -379,9 +452,9 @@ fun TrackpadScreen(
                     .background(SurfaceDark)
                     .border(1.dp, SurfaceContainerHighDark, RoundedCornerShape(16.dp))
                     .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
+                        detectVerticalDragGestures { change, dragAmount ->
                             change.consume()
-                            onScroll(dragAmount.y, 0f)
+                            scrollCb(dragAmount, 0f)
                         }
                     }
                     .testTag("vertical_scroll_strip"),
@@ -435,34 +508,21 @@ fun TrackpadScreen(
                 .height(64.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Left Click (Large)
-            Button(
-                onClick = {
-                    onMouseClick(HidConstants.MOUSE_BUTTON_LEFT)
-                },
+            // Left button: real press / release (hold it and drag with another finger)
+            PressHoldButton(
+                title = "CLIC GAUCHE",
+                subtitle = "Maintenir = glisser",
+                onPress = { buttonCb(HidConstants.MOUSE_BUTTON_LEFT, true) },
+                onRelease = { buttonCb(HidConstants.MOUSE_BUTTON_LEFT, false) },
                 modifier = Modifier
                     .weight(1.5f)
                     .fillMaxHeight()
-                    .testTag("left_click_button"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SurfaceContainerDark,
-                    contentColor = TextPrimary
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("CLIC GAUCHE", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("Sélection & Déplacement", fontSize = 9.sp, color = TextSecondary)
-                }
-            }
+                    .testTag("left_click_button")
+            )
 
-            // Middle Click with Drag Lock
+            // Drag lock: keeps the left button held across several swipes
             Button(
-                onClick = {
-                    isDragLocked = !isDragLocked
-                    onMouseClick(HidConstants.MOUSE_BUTTON_MIDDLE)
-                },
+                onClick = onToggleDragLock,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
@@ -480,33 +540,60 @@ fun TrackpadScreen(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = if (isDragLocked) "GLISSEMENT ACTIF" else "MILIEU / PAN",
+                        text = if (isDragLocked) "GLISSEMENT ACTIF" else "VERROU GLISSER",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 9.sp
                     )
                 }
             }
 
-            // Right Click
-            Button(
-                onClick = {
-                    onMouseClick(HidConstants.MOUSE_BUTTON_RIGHT)
-                },
+            PressHoldButton(
+                title = "CLIC DROIT",
+                subtitle = "Menu contextuel",
+                onPress = { buttonCb(HidConstants.MOUSE_BUTTON_RIGHT, true) },
+                onRelease = { buttonCb(HidConstants.MOUSE_BUTTON_RIGHT, false) },
                 modifier = Modifier
                     .weight(1.2f)
                     .fillMaxHeight()
-                    .testTag("right_click_button"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SurfaceContainerDark,
-                    contentColor = TextPrimary
-                )
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("CLIC DROIT", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("Menu contextuel", fontSize = 9.sp, color = TextSecondary)
-                }
-            }
+                    .testTag("right_click_button")
+            )
+        }
+    }
+}
+
+@Composable
+private fun PressHoldButton(
+    title: String,
+    subtitle: String,
+    onPress: () -> Unit,
+    onRelease: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var pressed by remember { mutableStateOf(false) }
+    val pressCb by rememberUpdatedState(onPress)
+    val releaseCb by rememberUpdatedState(onRelease)
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (pressed) NeonCyan.copy(alpha = 0.22f) else SurfaceContainerDark)
+            .border(1.dp, if (pressed) NeonCyan else SurfaceContainerHighDark, RoundedCornerShape(14.dp))
+            .pointerInput(Unit) {
+                detectTapGestures(onPress = {
+                    pressed = true
+                    pressCb()
+                    try {
+                        tryAwaitRelease()
+                    } finally {
+                        pressed = false
+                        releaseCb()
+                    }
+                })
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+            Text(subtitle, fontSize = 9.sp, color = TextSecondary)
         }
     }
 }

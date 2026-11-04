@@ -1,12 +1,18 @@
 package com.example.cutpilot.viewmodel
 
 import android.app.Application
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cutpilot.battery.BatteryTelemetryMonitor
 import com.example.cutpilot.bluetooth.BluetoothHidManager
 import com.example.cutpilot.bluetooth.HidConstants
 import com.example.cutpilot.data.DefaultPresets
+import com.example.cutpilot.data.PairingStore
+import com.example.cutpilot.input.InputSink
+import com.example.cutpilot.input.PointerProcessor
+import com.example.cutpilot.network.PairingInfo
+import com.example.cutpilot.network.VolavoProtocol
 import com.example.cutpilot.model.BatteryInfo
 import com.example.cutpilot.model.ConnectionMode
 import com.example.cutpilot.model.ConnectionStatus
@@ -20,7 +26,11 @@ import com.example.cutpilot.network.WifiControllerManager
 import com.example.cutpilot.util.HapticHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
@@ -49,7 +59,7 @@ data class HostSimState(
         SimulatedClip("c3", "Drone Sunset.mp4", 960, 1440, 0xFFF59E0B),
         SimulatedClip("c4", "Outro Logo Animation", 1440, 1800, 0xFF8B5CF6)
     ),
-    val lastActionLog: String = "Système prêt. Connecté ou prêt pour simulation.",
+    val lastActionLog: String = "Système prêt. Scannez le QR code de Vôlavo Hôte pour connecter le PC.",
     val lastEventTime: Long = System.currentTimeMillis()
 )
 
@@ -59,25 +69,39 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     private val wifiController = WifiControllerManager(application)
     private val batteryMonitor = BatteryTelemetryMonitor(application)
     private val haptic = HapticHelper(application)
+    private val pairingStore = PairingStore(application)
+    private val pointer = PointerProcessor()
+    private val deviceName: String = (Build.MODEL ?: "Android").take(40)
 
     // Navigation & Connection
     private val _currentTab = MutableStateFlow(MainNavigationTab.TRACKPAD)
     val currentTab: StateFlow<MainNavigationTab> = _currentTab.asStateFlow()
 
-    private val _connectionMode = MutableStateFlow(ConnectionMode.BLUETOOTH_HID)
+    private val _connectionMode = MutableStateFlow(pairingStore.connectionMode)
     val connectionMode: StateFlow<ConnectionMode> = _connectionMode.asStateFlow()
 
     private val _connectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     val connectionStatus: StateFlow<ConnectionStatus> = _connectionStatus.asStateFlow()
 
-    private val _connectedDeviceName = MutableStateFlow<String?>("MacBook Pro M3 Max")
+    private val _connectedDeviceName = MutableStateFlow<String?>(null)
     val connectedDeviceName: StateFlow<String?> = _connectedDeviceName.asStateFlow()
+
+    private val _connectionError = MutableStateFlow<String?>(null)
+    val connectionError: StateFlow<String?> = _connectionError.asStateFlow()
+
+    /** Last computer paired by QR code (shown on the connection screen). */
+    private val _pairedHost = MutableStateFlow(pairingStore.lastPairing)
+    val pairedHost: StateFlow<PairingInfo?> = _pairedHost.asStateFlow()
+
+    /** One-shot messages (toasts). */
+    private val _userMessages = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val userMessages: SharedFlow<String> = _userMessages.asSharedFlow()
 
     // Battery
     val batteryInfo: StateFlow<BatteryInfo> = batteryMonitor.batteryInfo
 
-    // Latency & Telemetry
-    private val _latencyInfo = MutableStateFlow(LatencyInfo(pingMs = 3, packetsSent = 1420, packetRateHz = 125))
+    // Latency & Telemetry (published at 1 Hz — never per touch event)
+    private val _latencyInfo = MutableStateFlow(LatencyInfo())
     val latencyInfo: StateFlow<LatencyInfo> = _latencyInfo.asStateFlow()
 
     // Settings
@@ -95,68 +119,187 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     private val _simState = MutableStateFlow(HostSimState())
     val simState: StateFlow<HostSimState> = _simState.asStateFlow()
 
+    private val _dragLocked = MutableStateFlow(false)
+    val dragLocked: StateFlow<Boolean> = _dragLocked.asStateFlow()
+
     private var playbackJob: Job? = null
+    private var buttonMask = 0
 
     init {
         batteryMonitor.startListening()
         bluetoothHid.initialize()
 
-        // Sync connection state
         viewModelScope.launch {
-            bluetoothHid.connectionStatus.collect { status ->
+            combine(
+                _connectionMode,
+                bluetoothHid.connectionStatus,
+                bluetoothHid.connectedDeviceName,
+                bluetoothHid.errorMessage
+            ) { mode, st, name, err -> if (mode == ConnectionMode.BLUETOOTH_HID) Triple(st, name, err) else null }
+                .collect { t ->
+                    t ?: return@collect
+                    _connectionStatus.value = t.first
+                    _connectedDeviceName.value = t.second ?: "Bluetooth HID"
+                    _connectionError.value = t.third
+                }
+        }
+        viewModelScope.launch {
+            combine(
+                _connectionMode,
+                wifiController.status,
+                wifiController.hostName,
+                wifiController.errorMessage
+            ) { mode, st, name, err -> if (mode == ConnectionMode.WIFI) Triple(st, name, err) else null }
+                .collect { t ->
+                    t ?: return@collect
+                    _connectionStatus.value = t.first
+                    _connectedDeviceName.value = t.second?.let { "Wi-Fi • $it" } ?: "Wi-Fi"
+                    _connectionError.value = t.third
+                }
+        }
+        viewModelScope.launch {
+            combine(_connectionMode, wifiController.latencyInfo) { mode, lat -> mode to lat }
+                .collect { (mode, lat) -> if (mode == ConnectionMode.WIFI) _latencyInfo.value = lat }
+        }
+        // Remember the computer that connected over Bluetooth for automatic reconnection.
+        viewModelScope.launch {
+            bluetoothHid.connectedDeviceAddress.collect { mac ->
+                if (mac != null) pairingStore.lastBluetoothHost = mac
+            }
+        }
+        // Bluetooth has no ping: publish the live report rate once per second.
+        viewModelScope.launch {
+            var last = bluetoothHid.packetsSent
+            while (isActive) {
+                delay(1000)
+                val now = bluetoothHid.packetsSent
                 if (_connectionMode.value == ConnectionMode.BLUETOOTH_HID) {
-                    _connectionStatus.value = status
+                    _latencyInfo.value = LatencyInfo(packetsSent = now, packetRateHz = (now - last).toInt(), measured = false)
                 }
+                last = now
             }
         }
-        viewModelScope.launch {
-            bluetoothHid.connectedDeviceName.collect { name ->
-                if (_connectionMode.value == ConnectionMode.BLUETOOTH_HID) {
-                    _connectedDeviceName.value = name
-                }
-            }
-        }
-        viewModelScope.launch {
-            wifiController.status.collect { status ->
-                if (_connectionMode.value == ConnectionMode.WIFI) {
-                    _connectionStatus.value = status
-                }
-            }
-        }
-        viewModelScope.launch {
-            wifiController.latencyInfo.collect { lat ->
-                if (_connectionMode.value == ConnectionMode.WIFI) {
-                    _latencyInfo.value = lat
-                }
-            }
-        }
+
+        applyConnectionMode(_connectionMode.value, autoConnect = true)
     }
 
     fun selectTab(tab: MainNavigationTab) {
         _currentTab.value = tab
     }
 
+    // =========================================================================
+    // Connection management
+    // =========================================================================
     fun setConnectionMode(mode: ConnectionMode) {
+        if (mode == _connectionMode.value) return
+        releaseAllInputs()
         _connectionMode.value = mode
+        pairingStore.connectionMode = mode
+        applyConnectionMode(mode, autoConnect = true)
+    }
+
+    private fun applyConnectionMode(mode: ConnectionMode, autoConnect: Boolean) {
+        if (mode != ConnectionMode.WIFI) wifiController.disconnect()
         when (mode) {
             ConnectionMode.BLUETOOTH_HID -> {
                 _connectionStatus.value = bluetoothHid.connectionStatus.value
-                _connectedDeviceName.value = bluetoothHid.connectedDeviceName.value ?: "Appairage Bluetooth HID"
+                _connectedDeviceName.value = bluetoothHid.connectedDeviceName.value ?: "Bluetooth HID"
+                if (autoConnect && !bluetoothHid.isReady) {
+                    pairingStore.lastBluetoothHost?.let { bluetoothHid.connectTo(it) }
+                }
             }
             ConnectionMode.WIFI -> {
-                _connectionStatus.value = wifiController.status.value
-                _connectedDeviceName.value = "Wi-Fi (${wifiController.targetIp.value})"
+                if (autoConnect && !wifiController.isReady) {
+                    pairingStore.lastPairing?.let { wifiController.connect(it, deviceName) }
+                }
             }
             ConnectionMode.SIMULATOR -> {
                 _connectionStatus.value = ConnectionStatus.CONNECTED
                 _connectedDeviceName.value = "Simulateur Timeline Intégré"
+                _connectionError.value = null
+                _latencyInfo.value = LatencyInfo()
             }
         }
     }
 
-    fun setTargetWifiIp(ip: String, port: Int = 8888) {
-        wifiController.configureTarget(ip, port)
-        _connectedDeviceName.value = "Hôte Wi-Fi ($ip)"
+    /**
+     * Entry point for a scanned QR code or a `volavo://pair` link.
+     * Returns false when the content is not a Vôlavo pairing code.
+     */
+    fun handlePairingPayload(raw: String?): Boolean {
+        val info = raw?.let { PairingInfo.parse(it) }
+        if (info == null) {
+            _userMessages.tryEmit("Ce QR code n'est pas un code Vôlavo Hôte.")
+            return false
+        }
+        pairWith(info)
+        return true
+    }
+
+    /** Manual fallback: IP address + the code displayed by Vôlavo Hôte. */
+    fun connectManual(ip: String, code: String, port: Int = VolavoProtocol.DEFAULT_PORT): Boolean {
+        val key = PairingInfo.normalizeKey(code)
+        val info = PairingInfo.parse(
+            PairingInfo(listOf(ip.trim()), port, key, ip.trim()).toUri()
+        )
+        if (info == null) {
+            _userMessages.tryEmit("Adresse IP ou code invalide.")
+            return false
+        }
+        pairWith(info)
+        return true
+    }
+
+    private fun pairWith(info: PairingInfo) {
+        pairingStore.lastPairing = info
+        _pairedHost.value = info
+        triggerHapticClick()
+        val mac = info.bluetoothMac
+        if (_connectionMode.value == ConnectionMode.BLUETOOTH_HID && mac != null && bluetoothHid.isBluetoothEnabled()) {
+            pairingStore.lastBluetoothHost = mac
+            bluetoothHid.connectTo(mac)
+            _userMessages.tryEmit("Connexion Bluetooth à ${info.hostName}… acceptez l'appairage sur l'ordinateur.")
+        } else {
+            if (_connectionMode.value != ConnectionMode.WIFI) {
+                releaseAllInputs()
+                _connectionMode.value = ConnectionMode.WIFI
+                pairingStore.connectionMode = ConnectionMode.WIFI
+                applyConnectionMode(ConnectionMode.WIFI, autoConnect = false)
+            }
+            wifiController.connect(info, deviceName)
+            _userMessages.tryEmit("Connexion Wi-Fi à ${info.hostName}…")
+        }
+        logAction("Appairage QR : ${info.hostName}")
+    }
+
+    fun reconnect() = applyConnectionMode(_connectionMode.value, autoConnect = true)
+
+    fun disconnect() {
+        releaseAllInputs()
+        when (_connectionMode.value) {
+            ConnectionMode.WIFI -> wifiController.disconnect()
+            ConnectionMode.BLUETOOTH_HID -> bluetoothHid.disconnect()
+            ConnectionMode.SIMULATOR -> {}
+        }
+    }
+
+    fun forgetPairing() {
+        disconnect()
+        pairingStore.lastPairing = null
+        pairingStore.lastBluetoothHost = null
+        _pairedHost.value = null
+    }
+
+    /** Called once the Bluetooth runtime permissions have been answered. */
+    fun onBluetoothPermissionsResult() {
+        bluetoothHid.initialize()
+        if (_connectionMode.value == ConnectionMode.BLUETOOTH_HID) {
+            pairingStore.lastBluetoothHost?.let { bluetoothHid.connectTo(it) }
+        }
+    }
+
+    fun setTargetWifiIp(ip: String, code: String) {
+        connectManual(ip, code)
     }
 
     fun selectProfile(profile: SoftwareProfile) {
@@ -173,89 +316,123 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
         val current = _settings.value.sniperMode
         _settings.value = _settings.value.copy(sniperMode = !current)
         triggerHapticClick()
-        logAction(if (!current) "Mode Sniper Chirurgical activé (0.22x)" else "Mode Sniper désactivé (1.0x)")
+        logAction(if (!current) "Mode Sniper Chirurgical activé (${(_settings.value.sniperMultiplier * 100).toInt()} %)" else "Mode Sniper désactivé (1.0x)")
     }
 
-    // Touchpad & Mouse movements
-    fun onMouseMove(rawDx: Float, rawDy: Float) {
-        val sensitivity = _settings.value.sensitivity
-        val sniperMultiplier = if (_settings.value.sniperMode) _settings.value.sniperMultiplier else 1.0f
+    // =========================================================================
+    // Pointer — hot path (called for every touch event, keep allocation-free)
+    // =========================================================================
+    private fun sink(): InputSink? = when (_connectionMode.value) {
+        ConnectionMode.BLUETOOTH_HID -> bluetoothHid
+        ConnectionMode.WIFI -> wifiController
+        ConnectionMode.SIMULATOR -> null
+    }
 
-        val accelFactor = if (_settings.value.acceleration) {
-            val speed = Math.hypot(rawDx.toDouble(), rawDy.toDouble()).toFloat()
-            if (speed > 20f) 1.5f else 1.0f
-        } else 1.0f
-
-        val finalDx = (rawDx * sensitivity * sniperMultiplier * accelFactor).toInt()
-        val finalDy = (rawDy * sensitivity * sniperMultiplier * accelFactor).toInt()
-
-        // Send via active transport
-        when (_connectionMode.value) {
-            ConnectionMode.BLUETOOTH_HID -> {
-                bluetoothHid.sendMouseMove(finalDx, finalDy)
-            }
-            ConnectionMode.WIFI -> {
-                wifiController.sendMouseMove(finalDx, finalDy)
-            }
-            ConnectionMode.SIMULATOR -> {}
-        }
-
-        // Update virtual host cursor
-        val cur = _simState.value
-        val newX = (cur.cursorX + finalDx / 1000f).coerceIn(0.02f, 0.98f)
-        val newY = (cur.cursorY + finalDy / 800f).coerceIn(0.05f, 0.95f)
-        _simState.value = cur.copy(cursorX = newX, cursorY = newY)
-
-        // Increment packet count
-        _latencyInfo.value = _latencyInfo.value.copy(
-            packetsSent = _latencyInfo.value.packetsSent + 1
+    fun onMouseMove(rawDx: Float, rawDy: Float, dtMs: Long = 8L) {
+        val s = _settings.value
+        val packed = pointer.process(
+            rawDx, rawDy, dtMs,
+            sensitivity = s.sensitivity,
+            acceleration = s.acceleration,
+            precisionMultiplier = if (s.sniperMode) s.sniperMultiplier else 1f
         )
+        val dx = PointerProcessor.unpackFirst(packed)
+        val dy = PointerProcessor.unpackSecond(packed)
+        if (dx == 0 && dy == 0) return
+
+        val out = sink()
+        if (out != null) {
+            out.move(dx, dy)
+        } else {
+            // Simulator only: the virtual host cursor is UI state.
+            val cur = _simState.value
+            _simState.value = cur.copy(
+                cursorX = (cur.cursorX + dx / 1000f).coerceIn(0.02f, 0.98f),
+                cursorY = (cur.cursorY + dy / 800f).coerceIn(0.05f, 0.95f)
+            )
+        }
+    }
+
+    /** Physical-style button: [down] = pressed, false = released. */
+    fun onMouseButton(button: Int, down: Boolean) {
+        val newMask = if (down) buttonMask or button else buttonMask and button.inv()
+        if (newMask == buttonMask) return
+        buttonMask = newMask
+        if (button == HidConstants.MOUSE_BUTTON_LEFT && !down) _dragLocked.value = false
+        if (down) triggerHapticClick()
+        sink()?.setButtons(buttonMask)
     }
 
     fun onMouseClick(button: Int) { // 1 = Left, 2 = Right, 4 = Middle
         triggerHapticClick()
-        when (_connectionMode.value) {
-            ConnectionMode.BLUETOOTH_HID -> {
-                bluetoothHid.sendMouseMove(0, 0, button)
-                viewModelScope.launch {
-                    delay(20)
-                    bluetoothHid.sendMouseMove(0, 0, 0)
-                }
-            }
-            ConnectionMode.WIFI -> {
-                wifiController.sendMouseMove(0, 0, button)
-            }
-            ConnectionMode.SIMULATOR -> {}
+        val out = sink()
+        if (out != null) {
+            out.setButtons(buttonMask or button)
+            out.setButtons(buttonMask)
         }
-
-        val btnName = when (button) {
-            HidConstants.MOUSE_BUTTON_LEFT -> "Clic Gauche"
-            HidConstants.MOUSE_BUTTON_RIGHT -> "Clic Droit"
-            HidConstants.MOUSE_BUTTON_MIDDLE -> "Clic Milieu"
-            else -> "Clic"
+        if (_connectionMode.value == ConnectionMode.SIMULATOR) {
+            val btnName = when (button) {
+                HidConstants.MOUSE_BUTTON_LEFT -> "Clic Gauche"
+                HidConstants.MOUSE_BUTTON_RIGHT -> "Clic Droit"
+                HidConstants.MOUSE_BUTTON_MIDDLE -> "Clic Milieu"
+                else -> "Clic"
+            }
+            logAction("Événement Souris : $btnName")
         }
-        logAction("Événement Souris : $btnName")
     }
 
-    fun onScroll(deltaY: Float, deltaX: Float = 0f) {
-        val direction = if (_settings.value.naturalScroll) -1 else 1
-        val wheel = (deltaY * direction).toInt().coerceIn(-127, 127)
+    fun onMouseDoubleClick() {
+        onMouseClick(HidConstants.MOUSE_BUTTON_LEFT)
+        onMouseClick(HidConstants.MOUSE_BUTTON_LEFT)
+    }
 
+    /** Drag lock keeps the left button held so a long drag can span several swipes. */
+    fun setDragLock(locked: Boolean) {
+        onMouseButton(HidConstants.MOUSE_BUTTON_LEFT, locked)
+        _dragLocked.value = locked
+        logAction(if (locked) "Verrou de glissement activé" else "Verrou de glissement relâché")
+    }
+
+    /** Two-finger / strip scroll, raw finger pixels. */
+    fun onScroll(deltaY: Float, deltaX: Float = 0f) {
+        val s = _settings.value
+        val packed = pointer.processScroll(deltaY, deltaX, s.scrollSpeed, s.naturalScroll)
+        val v = PointerProcessor.unpackFirst(packed)
+        val h = PointerProcessor.unpackSecond(packed)
+        if (v == 0 && h == 0) return
+        val out = sink()
+        if (out != null) {
+            out.scroll(v, h)
+        } else {
+            val cur = _simState.value
+            val newFrame = (cur.currentFrame - v / 10).coerceIn(0, cur.totalFrames)
+            _simState.value = cur.copy(currentFrame = newFrame)
+        }
+    }
+
+    private fun releaseAllInputs() {
+        if (buttonMask != 0) sink()?.setButtons(0)
+        buttonMask = 0
+        _dragLocked.value = false
+        pointer.reset()
+    }
+
+    /** Sends a key through the active transport (layout-aware for Bluetooth HID). */
+    private fun sendKey(modifiers: Set<ModifierKey>, keySymbol: String) {
+        val usage = HidConstants.symbolToHidCode(keySymbol).toInt() and 0xFF
+        if (usage == 0) return
+        sendKeyUsage(HidConstants.modifierBits(modifiers), usage)
+    }
+
+    private fun sendKeyUsage(mods: Int, usage: Int) {
         when (_connectionMode.value) {
             ConnectionMode.BLUETOOTH_HID -> {
-                bluetoothHid.sendMouseMove(0, 0, 0, wheel)
+                val u = if (_settings.value.azertyHost) HidConstants.remapForAzerty(usage) else usage
+                bluetoothHid.key(mods, u, VolavoProtocol.KEY_TAP)
             }
-            ConnectionMode.WIFI -> {
-                wifiController.sendMouseMove(0, 0, 0, wheel)
-            }
+            ConnectionMode.WIFI -> wifiController.key(mods, usage, VolavoProtocol.KEY_TAP)
             ConnectionMode.SIMULATOR -> {}
         }
-
-        // In simulator, scroll moves the timeline playhead or zoom
-        val cur = _simState.value
-        val frameShift = wheel * 4
-        val newFrame = (cur.currentFrame + frameShift).coerceIn(0, cur.totalFrames)
-        _simState.value = cur.copy(currentFrame = newFrame)
     }
 
     // Jog Wheel / Timeline Scrubbing
@@ -265,17 +442,9 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
 
         triggerHapticTick()
 
-        when (_connectionMode.value) {
-            ConnectionMode.BLUETOOTH_HID -> {
-                // Send Left / Right arrow HID keys
-                val key = if (steps > 0) HidConstants.KEY_RIGHT_ARROW else HidConstants.KEY_LEFT_ARROW
-                bluetoothHid.sendKeyPress(emptySet(), key)
-            }
-            ConnectionMode.WIFI -> {
-                wifiController.sendJogTick(steps, isFineSubpixel)
-            }
-            ConnectionMode.SIMULATOR -> {}
-        }
+        // One arrow key tap per step (frame-accurate in every NLE), capped for huge flicks.
+        val arrow = (if (steps > 0) HidConstants.KEY_RIGHT_ARROW else HidConstants.KEY_LEFT_ARROW).toInt()
+        repeat(kotlin.math.abs(deltaFrames).coerceAtMost(48)) { sendKeyUsage(0, arrow) }
 
         // Update simulated timeline
         val cur = _simState.value
@@ -294,15 +463,7 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
         triggerHapticClick()
         val currentlyPlaying = _simState.value.isPlaying
 
-        when (_connectionMode.value) {
-            ConnectionMode.BLUETOOTH_HID -> {
-                bluetoothHid.sendKeyPress(emptySet(), HidConstants.KEY_SPACE)
-            }
-            ConnectionMode.WIFI -> {
-                wifiController.sendKeyPress(emptySet(), "ESPACE")
-            }
-            ConnectionMode.SIMULATOR -> {}
-        }
+        sendKey(emptySet(), "ESPACE")
 
         if (currentlyPlaying) {
             playbackJob?.cancel()
@@ -317,11 +478,7 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
 
     fun shuttleReverse() {
         triggerHapticClick()
-        when (_connectionMode.value) {
-            ConnectionMode.BLUETOOTH_HID -> bluetoothHid.sendKeyPress(emptySet(), HidConstants.KEY_J)
-            ConnectionMode.WIFI -> wifiController.sendKeyPress(emptySet(), "J")
-            ConnectionMode.SIMULATOR -> {}
-        }
+        sendKey(emptySet(), "J")
         logAction("Navette arrière (J)")
         val cur = _simState.value
         _simState.value = cur.copy(currentFrame = (cur.currentFrame - 24).coerceAtLeast(0))
@@ -329,11 +486,7 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
 
     fun shuttleForward() {
         triggerHapticClick()
-        when (_connectionMode.value) {
-            ConnectionMode.BLUETOOTH_HID -> bluetoothHid.sendKeyPress(emptySet(), HidConstants.KEY_L)
-            ConnectionMode.WIFI -> wifiController.sendKeyPress(emptySet(), "L")
-            ConnectionMode.SIMULATOR -> {}
-        }
+        sendKey(emptySet(), "L")
         logAction("Navette avant (L)")
         val cur = _simState.value
         _simState.value = cur.copy(currentFrame = (cur.currentFrame + 24).coerceAtMost(cur.totalFrames))
@@ -360,16 +513,7 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     fun triggerShortcut(shortcut: ShortcutKey) {
         triggerHapticClick()
 
-        val hidCode = HidConstants.symbolToHidCode(shortcut.keySymbol)
-        when (_connectionMode.value) {
-            ConnectionMode.BLUETOOTH_HID -> {
-                bluetoothHid.sendKeyPress(shortcut.modifiers, hidCode)
-            }
-            ConnectionMode.WIFI -> {
-                wifiController.sendKeyPress(shortcut.modifiers, shortcut.keySymbol)
-            }
-            ConnectionMode.SIMULATOR -> {}
-        }
+        sendKey(shortcut.modifiers, shortcut.keySymbol)
 
         // Handle specific editing operations in host simulation
         handleSimulatedEditOperation(shortcut)
@@ -506,10 +650,9 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
 
     fun getLocalWifiIp(): String = wifiController.getLocalIpAddress()
 
-    fun getPythonServerScript(): String = WifiControllerManager.PYTHON_SERVER_SCRIPT
-
     override fun onCleared() {
         super.onCleared()
+        releaseAllInputs()
         batteryMonitor.stopListening()
         bluetoothHid.release()
         wifiController.close()

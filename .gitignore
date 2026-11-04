@@ -16,3 +16,11 @@
 local.properties
 .env
 debug.keystore
+
+# Vôlavo Hôte
+host/.venv/
+__pycache__/
+*.pyc
+host/build/
+host/dist/
+*.spec

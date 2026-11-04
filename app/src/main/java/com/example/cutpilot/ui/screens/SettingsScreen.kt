@@ -215,6 +215,42 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        Text("Défilement naturel", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        Text("Le contenu suit les doigts (comme un trackpad de portable)", color = TextSecondary, fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = settings.naturalScroll,
+                        onCheckedChange = { onUpdateSettings(settings.copy(naturalScroll = it)) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan, checkedTrackColor = NeonCyan.copy(alpha = 0.3f))
+                    )
+                }
+
+                HorizontalDivider(color = SurfaceContainerHighDark)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Ordinateur en AZERTY (Bluetooth)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        Text("Corrige les raccourcis A, Q, Z, W, M en mode Bluetooth HID. Inutile en Wi-Fi.", color = TextSecondary, fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = settings.azertyHost,
+                        onCheckedChange = { onUpdateSettings(settings.copy(azertyHost = it)) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = NeonCyan, checkedTrackColor = NeonCyan.copy(alpha = 0.3f))
+                    )
+                }
+
+                HorizontalDivider(color = SurfaceContainerHighDark)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Garder l'écran allumé", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                         Text("Empêche la mise en veille du téléphone pendant les sessions de montage", color = TextSecondary, fontSize = 10.sp)
                     }

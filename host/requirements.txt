@@ -1,0 +1,6 @@
+# Vôlavo Hôte — dépendances
+qrcode>=7.4
+# macOS / Linux X11 (Windows utilise SendInput natif, aucune dépendance)
+pynput>=1.7.6; sys_platform != "win32"
+# Linux : injection via /dev/uinput (fonctionne aussi sous Wayland)
+evdev>=1.6; sys_platform == "linux"

@@ -1,9 +1,5 @@
 package com.example.cutpilot.ui.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,9 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Wifi
@@ -57,7 +53,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import com.example.cutpilot.model.ConnectionMode
 import com.example.cutpilot.model.ConnectionStatus
 import com.example.cutpilot.model.LatencyInfo
+import com.example.cutpilot.network.PairingInfo
 import com.example.cutpilot.ui.theme.AmberAccent
 import com.example.cutpilot.ui.theme.DarkBg
 import com.example.cutpilot.ui.theme.EmeraldGreen
@@ -87,14 +83,20 @@ fun HostCompanionScreen(
     latencyInfo: LatencyInfo,
     simState: HostSimState,
     localWifiIp: String,
-    pythonServerCode: String,
+    pairedHost: PairingInfo?,
+    connectionError: String?,
     onSelectConnectionMode: (ConnectionMode) -> Unit,
-    onConfigureWifiTarget: (String) -> Unit,
+    onScanQr: () -> Unit,
+    onManualConnect: (ip: String, code: String) -> Unit,
+    onReconnect: () -> Unit,
+    onDisconnect: () -> Unit,
+    onForgetPairing: () -> Unit,
+    onMakeDiscoverable: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    var selectedSubTab by remember { mutableIntStateOf(0) } // 0: Connexion, 1: Simulateur PC en direct, 2: Script Wi-Fi
-    var inputIp by remember { mutableStateOf("192.168.1.100") }
+    var selectedSubTab by remember { mutableIntStateOf(0) } // 0: Connexion, 1: Simulateur PC en direct, 2: Logiciel PC
+    var inputIp by remember { mutableStateOf(pairedHost?.hosts?.firstOrNull() ?: "") }
+    var inputCode by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -131,7 +133,7 @@ fun HostCompanionScreen(
             Tab(
                 selected = selectedSubTab == 2,
                 onClick = { selectedSubTab = 2 },
-                text = { Text("Serveur Wi-Fi", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Logiciel PC", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
             )
         }
 
@@ -139,6 +141,21 @@ fun HostCompanionScreen(
 
         when (selectedSubTab) {
             0 -> {
+                QuickPairCard(
+                    connectionMode = connectionMode,
+                    connectionStatus = connectionStatus,
+                    connectedDeviceName = connectedDeviceName,
+                    latencyInfo = latencyInfo,
+                    pairedHost = pairedHost,
+                    connectionError = connectionError,
+                    onScanQr = onScanQr,
+                    onReconnect = onReconnect,
+                    onDisconnect = onDisconnect,
+                    onForgetPairing = onForgetPairing
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 // Connection Mode Selector
                 Text(
                     text = "PROTOCOLE DE LIAISON",
@@ -258,13 +275,25 @@ fun HostCompanionScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     val steps = listOf(
-                        "1. Sur votre PC (Windows 10/11) ou Mac : ouvrez les Paramètres Bluetooth.",
-                        "2. Cliquez sur 'Ajouter un appareil' ou 'Associer un nouvel appareil'.",
-                        "3. Sélectionnez 'Vôlavo Mouse & Deck' dans la liste.",
-                        "4. Terminé ! Le système hôte le reconnaît immédiatement comme une véritable souris sans fil."
+                        "Le plus simple : scannez le QR code de Vôlavo Hôte, le téléphone se connecte directement au Bluetooth du PC.",
+                        "Sans logiciel : touchez « Rendre visible » ci-dessous, puis sur le PC ouvrez Paramètres › Bluetooth › Ajouter un appareil.",
+                        "Sélectionnez « Vôlavo Mouse & Deck » : il est reconnu comme une vraie souris + clavier.",
+                        "Les fois suivantes, la reconnexion est automatique."
                     )
-                    steps.forEach { step ->
-                        Text(text = step, color = TextSecondary, fontSize = 11.sp, modifier = Modifier.padding(vertical = 2.dp))
+                    steps.forEachIndexed { i, step ->
+                        Text(text = "${i + 1}. $step", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.padding(vertical = 2.dp))
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = onMakeDiscoverable,
+                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceContainerHighDark, contentColor = NeonCyan),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Bluetooth, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Rendre le téléphone visible (2 min)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -280,8 +309,11 @@ fun HostCompanionScreen(
                         Icon(Icons.Default.Speed, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
-                            Text("Latence mesurée : ${latencyInfo.pingMs} ms", color = EmeraldGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("Taux de rafraîchissement 125 Hz • Zéro saccade sur timeline", color = TextTertiary, fontSize = 9.sp)
+                            Text(
+                                if (latencyInfo.measured) "Latence aller-retour mesurée : ${latencyInfo.pingMs} ms" else "Liaison Bluetooth HID native",
+                                color = EmeraldGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp
+                            )
+                            Text("${latencyInfo.packetRateHz} paquets/s • envoi direct, mouvements fusionnés sans file d'attente", color = TextTertiary, fontSize = 9.sp)
                         }
                     }
                 }
@@ -453,7 +485,6 @@ fun HostCompanionScreen(
             }
 
             2 -> {
-                // Wi-Fi Host Companion Script & Manual Target
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -463,84 +494,188 @@ fun HostCompanionScreen(
                         .padding(14.dp)
                 ) {
                     Text(
-                        text = "📡 Configuration Wi-Fi (Alternative au Bluetooth)",
+                        text = "💻 Vôlavo Hôte — le petit logiciel pour l'ordinateur",
                         color = TextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val steps = listOf(
+                        "Copiez le dossier « host » du projet Vôlavo sur l'ordinateur (Windows, macOS ou Linux, Python 3.8+).",
+                        "Windows : double-cliquez sur start_windows.bat. macOS / Linux : lancez ./start_mac_linux.sh.",
+                        "Une fenêtre affiche un QR code : touchez « Scanner le QR code » dans l'onglet Appairage Rapide.",
+                        "C'est tout. Le téléphone se reconnecte tout seul aux prochains lancements."
+                    )
+                    steps.forEachIndexed { i, step ->
+                        Text(text = "${i + 1}. $step", color = TextSecondary, fontSize = 11.sp, modifier = Modifier.padding(vertical = 2.dp))
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Adresse IP locale du smartphone : $localWifiIp",
+                        text = "Avantages Wi-Fi : défilement haute résolution, latence mesurée en direct, raccourcis indépendants de la disposition clavier (AZERTY/QWERTY).",
                         color = AmberAccent,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
+                        fontSize = 10.sp
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(SurfaceDark)
+                        .border(1.dp, SurfaceContainerHighDark, RoundedCornerShape(16.dp))
+                        .padding(14.dp)
+                ) {
+                    Text(
+                        text = "⌨️ Connexion manuelle (sans caméra)",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "IP de ce téléphone : $localWifiIp — saisissez l'adresse et le code affichés par Vôlavo Hôte.",
+                        color = TextSecondary,
+                        fontSize = 10.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = inputIp,
-                        onValueChange = { inputIp = it },
-                        label = { Text("Adresse IP du PC hôte (ex: 192.168.1.50)") },
+                        onValueChange = { inputIp = it.trim() },
+                        label = { Text("Adresse IP du PC (ex : 192.168.1.50)") },
+                        singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
-
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = inputCode,
+                        onValueChange = { inputCode = it.uppercase() },
+                        label = { Text("Code (ex : ABCD-EFGH-JKLM-NPQR)") },
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-
                     Button(
-                        onClick = {
-                            onConfigureWifiTarget(inputIp.trim())
-                            Toast.makeText(context, "Cible Wi-Fi définie sur $inputIp:8888", Toast.LENGTH_SHORT).show()
-                        },
+                        onClick = { onManualConnect(inputIp, inputCode) },
+                        enabled = inputIp.isNotBlank() && PairingInfo.isValidKey(PairingInfo.normalizeKey(inputCode)),
                         colors = ButtonDefaults.buttonColors(containerColor = AmberAccent, contentColor = DarkBg),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Connecter à l'adresse IP de la station", fontWeight = FontWeight.Bold)
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Script Python Compagnon (15 lignes)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-
-                        Button(
-                            onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("CutPilot Server Script", pythonServerCode)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "Script copié dans le presse-papiers !", Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceContainerHighDark, contentColor = NeonCyan)
-                        ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Copier", fontSize = 11.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF08090D))
-                            .padding(10.dp)
-                    ) {
-                        Text(
-                            text = pythonServerCode,
-                            color = Color(0xFF6EE7B7),
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            lineHeight = 14.sp
-                        )
+                        Text("Connecter en Wi-Fi", fontWeight = FontWeight.Bold)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun QuickPairCard(
+    connectionMode: ConnectionMode,
+    connectionStatus: ConnectionStatus,
+    connectedDeviceName: String?,
+    latencyInfo: LatencyInfo,
+    pairedHost: PairingInfo?,
+    connectionError: String?,
+    onScanQr: () -> Unit,
+    onReconnect: () -> Unit,
+    onDisconnect: () -> Unit,
+    onForgetPairing: () -> Unit
+) {
+    val statusColor = when (connectionStatus) {
+        ConnectionStatus.CONNECTED -> EmeraldGreen
+        ConnectionStatus.CONNECTING, ConnectionStatus.SCANNING -> AmberAccent
+        ConnectionStatus.ERROR -> RazorRed
+        ConnectionStatus.DISCONNECTED -> TextTertiary
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(SurfaceDark)
+            .border(1.dp, NeonCyan.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+            .padding(14.dp)
+    ) {
+        Button(
+            onClick = onScanQr,
+            colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkBg),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .testTag("scan_qr_button")
+        ) {
+            Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(22.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Scanner le QR code du PC", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(statusColor)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = when (connectionStatus) {
+                    ConnectionStatus.CONNECTED -> "Connecté — ${connectedDeviceName ?: "ordinateur"}"
+                    ConnectionStatus.CONNECTING -> "Connexion en cours…"
+                    ConnectionStatus.SCANNING -> "Recherche…"
+                    ConnectionStatus.ERROR -> "Échec de connexion"
+                    ConnectionStatus.DISCONNECTED -> "Non connecté"
+                },
+                color = statusColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+            if (connectionStatus == ConnectionStatus.CONNECTED && latencyInfo.measured) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("${latencyInfo.pingMs} ms", color = TextSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            }
+        }
+
+        connectionError?.let {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(it, color = RazorRed, fontSize = 10.sp)
+        }
+
+        if (pairedHost != null && connectionMode != ConnectionMode.SIMULATOR) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "PC mémorisé : ${pairedHost.hostName} (${pairedHost.hosts.first()})" +
+                    (pairedHost.bluetoothMac?.let { " • BT $it" } ?: ""),
+                color = TextTertiary,
+                fontSize = 10.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                val chipColors = ButtonDefaults.buttonColors(containerColor = SurfaceContainerHighDark, contentColor = TextPrimary)
+                if (connectionStatus == ConnectionStatus.CONNECTED) {
+                    Button(onClick = onDisconnect, colors = chipColors, modifier = Modifier.weight(1f)) {
+                        Text("Déconnecter", fontSize = 11.sp)
+                    }
+                } else {
+                    Button(onClick = onReconnect, colors = chipColors, modifier = Modifier.weight(1f)) {
+                        Text("Reconnecter", fontSize = 11.sp)
+                    }
+                }
+                Button(onClick = onForgetPairing, colors = chipColors, modifier = Modifier.weight(1f)) {
+                    Text("Oublier ce PC", fontSize = 11.sp)
+                }
+            }
+        } else {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Lancez « Vôlavo Hôte » sur l'ordinateur puis scannez le code affiché. Astuce : sur la plupart des téléphones, l'appareil photo fonctionne aussi.",
+                color = TextTertiary,
+                fontSize = 10.sp
+            )
         }
     }
 }

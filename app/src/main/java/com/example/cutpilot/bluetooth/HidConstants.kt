@@ -66,56 +66,96 @@ object HidConstants {
     const val KEY_TILDE: Byte = 0x35
     const val KEY_F9: Byte = 0x42
     const val KEY_0: Byte = 0x27
+    const val KEY_1: Byte = 0x1E
+    const val KEY_SEMICOLON: Byte = 0x33
+    const val KEY_QUOTE: Byte = 0x34
+    const val KEY_COMMA: Byte = 0x36
+    const val KEY_PERIOD: Byte = 0x37
+    const val KEY_SLASH: Byte = 0x38
+    const val KEY_F1: Byte = 0x3A
+    const val KEY_INSERT: Byte = 0x49
+    const val KEY_HOME: Byte = 0x4A
+    const val KEY_PAGE_UP: Byte = 0x4B
+    const val KEY_END: Byte = 0x4D
+    const val KEY_PAGE_DOWN: Byte = 0x4E
+
+    /** Unknown symbol: nothing is sent (previously fell back to SPACE = accidental play/pause). */
+    const val KEY_NONE: Byte = 0
 
     fun symbolToHidCode(symbol: String): Byte {
-        return when (symbol.uppercase().trim()) {
-            "A" -> KEY_A
-            "B" -> KEY_B
-            "C" -> KEY_C
-            "D" -> KEY_D
-            "E" -> KEY_E
-            "F" -> KEY_F
-            "G" -> KEY_G
-            "H" -> KEY_H
-            "I" -> KEY_I
-            "J" -> KEY_J
-            "K" -> KEY_K
-            "L" -> KEY_L
-            "M" -> KEY_M
-            "N" -> KEY_N
-            "O" -> KEY_O
-            "P" -> KEY_P
-            "Q" -> KEY_Q
-            "R" -> KEY_R
-            "S" -> KEY_S
-            "T" -> KEY_T
-            "U" -> KEY_U
-            "V" -> KEY_V
-            "W" -> KEY_W
-            "X" -> KEY_X
-            "Y" -> KEY_Y
-            "Z" -> KEY_Z
+        val sym = symbol.uppercase().trim()
+        if (sym.length == 1) {
+            val c = sym[0]
+            when (c) {
+                in 'A'..'Z' -> return (KEY_A + (c - 'A')).toByte()
+                in '1'..'9' -> return (KEY_1 + (c - '1')).toByte()
+                '0' -> return KEY_0
+            }
+        }
+        if (sym.length in 2..3 && sym[0] == 'F') {
+            sym.substring(1).toIntOrNull()?.takeIf { it in 1..12 }?.let { return (KEY_F1 + it - 1).toByte() }
+        }
+        return when (sym) {
             "ESPACE", "SPACE" -> KEY_SPACE
-            "ENTRER", "ENTER" -> KEY_ENTER
+            "ENTRER", "ENTER", "ENTRÉE" -> KEY_ENTER
+            "ECHAP", "ÉCHAP", "ESC", "ESCAPE" -> KEY_ESCAPE
             "DEL", "DELETE", "SUPPR" -> KEY_DELETE
+            "BACKSPACE", "RETOUR" -> KEY_BACKSPACE
+            "TAB" -> KEY_TAB
             "HAUT", "UP" -> KEY_UP_ARROW
             "BAS", "DOWN" -> KEY_DOWN_ARROW
             "GAUCHE", "LEFT" -> KEY_LEFT_ARROW
             "DROITE", "RIGHT" -> KEY_RIGHT_ARROW
+            "HOME", "DÉBUT", "DEBUT" -> KEY_HOME
+            "END", "FIN" -> KEY_END
+            "PAGEUP", "PGUP" -> KEY_PAGE_UP
+            "PAGEDOWN", "PGDN" -> KEY_PAGE_DOWN
+            "INSERT", "INSER" -> KEY_INSERT
             "+", "=" -> KEY_EQUAL
             "-" -> KEY_MINUS
             "[" -> KEY_LEFT_BRACKET
             "]" -> KEY_RIGHT_BRACKET
             "\\", "BACKSLASH" -> KEY_BACKSLASH
-            "~" -> KEY_TILDE
-            "F9" -> KEY_F9
-            "0" -> KEY_0
-            else -> KEY_SPACE
+            "~", "`" -> KEY_TILDE
+            ";" -> KEY_SEMICOLON
+            "'" -> KEY_QUOTE
+            "," -> KEY_COMMA
+            "." -> KEY_PERIOD
+            "/" -> KEY_SLASH
+            else -> KEY_NONE
         }
     }
 
     /**
-     * Standard USB HID descriptor defining a Mouse (Report ID 1) and Keyboard (Report ID 2)
+     * Bluetooth HID transmits *physical* key positions; the computer applies its own layout.
+     * On an AZERTY computer the US positions of A/Q, Z/W and M differ, so we send the
+     * position where the requested letter actually lives. (Wi-Fi sends semantic keys and
+     * needs no remapping.)
+     */
+    fun remapForAzerty(usage: Int): Int = when (usage) {
+        KEY_A.toInt() -> KEY_Q.toInt()
+        KEY_Q.toInt() -> KEY_A.toInt()
+        KEY_Z.toInt() -> KEY_W.toInt()
+        KEY_W.toInt() -> KEY_Z.toInt()
+        KEY_M.toInt() -> KEY_SEMICOLON.toInt()
+        else -> usage
+    }
+
+    fun modifierBits(modifiers: Set<com.example.cutpilot.model.ModifierKey>): Int {
+        var bits = 0
+        for (m in modifiers) {
+            bits = bits or when (m) {
+                com.example.cutpilot.model.ModifierKey.CTRL -> MOD_LEFT_CTRL.toInt()
+                com.example.cutpilot.model.ModifierKey.SHIFT -> MOD_LEFT_SHIFT.toInt()
+                com.example.cutpilot.model.ModifierKey.ALT -> MOD_LEFT_ALT.toInt()
+                com.example.cutpilot.model.ModifierKey.CMD -> MOD_LEFT_META.toInt()
+            }
+        }
+        return bits
+    }
+
+    /**
+     * Standard USB HID descriptor defining a Mouse (Report ID 1: buttons, X, Y, wheel, pan) and Keyboard (Report ID 2)
      */
     val HID_REPORT_DESCRIPTOR = byteArrayOf(
         // Mouse (Report ID 1)
@@ -149,6 +189,14 @@ object HidConstants {
         0x81.toByte(), 0x06.toByte(), // INPUT (Data,Var,Rel)
         // Wheel / Scroll
         0x09.toByte(), 0x38.toByte(), // USAGE (Wheel)
+        0x15.toByte(), 0x81.toByte(), // LOGICAL_MINIMUM (-127)
+        0x25.toByte(), 0x7F.toByte(), // LOGICAL_MAXIMUM (127)
+        0x75.toByte(), 0x08.toByte(), // REPORT_SIZE (8)
+        0x95.toByte(), 0x01.toByte(), // REPORT_COUNT (1)
+        0x81.toByte(), 0x06.toByte(), // INPUT (Data,Var,Rel)
+        // Horizontal scroll (AC Pan) — timelines scroll sideways natively
+        0x05.toByte(), 0x0C.toByte(), // USAGE_PAGE (Consumer Devices)
+        0x0A.toByte(), 0x38.toByte(), 0x02.toByte(), // USAGE (AC Pan)
         0x15.toByte(), 0x81.toByte(), // LOGICAL_MINIMUM (-127)
         0x25.toByte(), 0x7F.toByte(), // LOGICAL_MAXIMUM (127)
         0x75.toByte(), 0x08.toByte(), // REPORT_SIZE (8)

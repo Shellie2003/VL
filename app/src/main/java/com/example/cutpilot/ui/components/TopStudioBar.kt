@@ -120,7 +120,7 @@ fun TopStudioBar(
                 )
                 Text(
                     text = when (connectionStatus) {
-                        ConnectionStatus.CONNECTED -> "${latencyInfo.pingMs} ms • 125 Hz"
+                        ConnectionStatus.CONNECTED -> if (latencyInfo.measured) "${latencyInfo.pingMs} ms • ${latencyInfo.packetRateHz} pkt/s" else "Liaison directe • ${latencyInfo.packetRateHz} pkt/s"
                         ConnectionStatus.CONNECTING -> "Connexion en cours…"
                         ConnectionStatus.SCANNING -> "Recherche hôte…"
                         ConnectionStatus.DISCONNECTED -> "Non appairé"

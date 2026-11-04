@@ -22,9 +22,11 @@ data class BatteryInfo(
 )
 
 data class LatencyInfo(
-    val pingMs: Int = 4,
+    val pingMs: Int = 0,
     val packetsSent: Long = 0,
-    val packetRateHz: Int = 125
+    val packetRateHz: Int = 0,
+    /** true when [pingMs] is a real round-trip measurement (Wi-Fi PING/PONG). */
+    val measured: Boolean = false
 )
 
 enum class ModifierKey {
@@ -63,7 +65,10 @@ data class ControllerSettings(
     val tapToClick: Boolean = true,
     val jogSensitivity: Float = 1.0f,
     val keepScreenAwake: Boolean = true,
-    val highContrastPointers: Boolean = true
+    val highContrastPointers: Boolean = true,
+    /** Bluetooth HID sends physical key positions: remap letters for an AZERTY computer. */
+    val azertyHost: Boolean = false,
+    val scrollSpeed: Float = 1.0f
 )
 
 enum class MainNavigationTab {
