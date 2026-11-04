@@ -10,6 +10,10 @@ Phone -> host
   0x05 KEY      u8 modifiers (HID bits), u8 HID usage, u8 action (0 tap, 1 down, 2 up)
   0x06 PING     opaque payload (echoed back verbatim)
   0x07 BYE
+  0x08 KEY_PHYS u8 modifiers, u8 HID usage, u8 action — *physical* key position
+                (interpreted by the computer's own layout: AZERTY, QWERTY…)
+  0x09 TEXT     UTF-8 text to type as-is (any character, accents, emoji)
+  0x0A MEDIA    u16 HID consumer usage (volume, play/pause, next…)
 
 Host -> phone
   0x81 HELLO_ACK  u8 status (0 ok, 1 bad key, 2 bad version), UTF-8 host name
@@ -33,6 +37,9 @@ T_SCROLL = 0x04
 T_KEY = 0x05
 T_PING = 0x06
 T_BYE = 0x07
+T_KEY_PHYS = 0x08
+T_TEXT = 0x09
+T_MEDIA = 0x0A
 
 T_HELLO_ACK = 0x81
 T_PONG = 0x86
@@ -54,6 +61,9 @@ MOD_CTRL = 0x01
 MOD_SHIFT = 0x02
 MOD_ALT = 0x04
 MOD_META = 0x08
+MOD_RALT = 0x40  # AltGr
+
+S_U16 = struct.Struct("!H")
 
 S_MOVE = struct.Struct("!hh")
 S_SCROLL = struct.Struct("!hh")

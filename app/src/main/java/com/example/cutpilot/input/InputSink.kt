@@ -18,6 +18,21 @@ interface InputSink {
     /** HID modifier bits + HID usage id; action = KEY_TAP / KEY_DOWN / KEY_UP. */
     fun key(modifiers: Int, usage: Int, action: Int)
 
+    /**
+     * Key identified by its *physical position* (HID usage). The computer applies its own
+     * layout, so a virtual keyboard drawn in AZERTY or QWERTY matches exactly.
+     */
+    fun keyPhysical(modifiers: Int, usage: Int, action: Int)
+
+    /**
+     * Types Unicode text directly. Returns false when the transport cannot (Bluetooth HID):
+     * the caller then converts characters to key strokes for the host layout.
+     */
+    fun text(text: String): Boolean
+
+    /** Media key (HID consumer usage: volume, play/pause…). */
+    fun media(usage: Int)
+
     /** Total packets/reports actually sent, used for the live rate indicator. */
     val packetsSent: Long
 }

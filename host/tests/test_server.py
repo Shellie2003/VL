@@ -88,6 +88,23 @@ class ServerTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: len(self.inj.events) >= len(expected)))
         self.assertEqual(self.inj.events, expected)
 
+    def test_keyboard_text_and_media(self):
+        self.phone.hello(self.key)
+        # AltGr + physical key 0x27 (AZERTY "@" position)
+        self.phone.send(bytes([P.T_KEY_PHYS]) + P.S_KEY.pack(P.MOD_RALT, 0x27, P.KEY_TAP))
+        self.phone.send(bytes([P.T_TEXT]) + "Été à Noël ✓\n".encode("utf-8"))
+        self.phone.send(bytes([P.T_MEDIA]) + P.S_U16.pack(0xE9))
+        # Win alone (modifier-only tap opens the Start menu)
+        self.phone.send(bytes([P.T_KEY]) + P.S_KEY.pack(P.MOD_META, 0, P.KEY_TAP))
+        expected = [
+            ("key", "altgr", True), ("phys", 0x27, True), ("phys", 0x27, False), ("key", "altgr", False),
+            ("text", "Été à Noël ✓\n"),
+            ("media", "volup"),
+            ("key", "meta", True), ("key", "meta", False),
+        ]
+        self.assertTrue(wait_for(lambda: len(self.inj.events) >= len(expected)))
+        self.assertEqual(self.inj.events, expected)
+
     def test_held_state_released_on_bye(self):
         self.phone.hello(self.key)
         self.phone.send(bytes([P.T_BUTTONS, P.BTN_RIGHT]))

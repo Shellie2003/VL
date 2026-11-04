@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mouse
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RotateRight
@@ -73,6 +74,33 @@ fun BottomNavBar(
                 unselectedTextColor = TextTertiary
             ),
             modifier = Modifier.testTag("tab_trackpad")
+        )
+
+        NavigationBarItem(
+            selected = currentTab == MainNavigationTab.KEYBOARD,
+            onClick = { onTabSelected(MainNavigationTab.KEYBOARD) },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Keyboard,
+                    contentDescription = "Clavier",
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            label = {
+                Text(
+                    "Clavier",
+                    fontSize = 10.sp,
+                    fontWeight = if (currentTab == MainNavigationTab.KEYBOARD) FontWeight.Bold else FontWeight.Normal
+                )
+            },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = NeonCyan,
+                selectedTextColor = NeonCyan,
+                indicatorColor = NeonCyan.copy(alpha = 0.15f),
+                unselectedIconColor = TextTertiary,
+                unselectedTextColor = TextTertiary
+            ),
+            modifier = Modifier.testTag("tab_keyboard")
         )
 
         NavigationBarItem(

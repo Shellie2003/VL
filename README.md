@@ -19,6 +19,19 @@ Le téléphone se reconnecte ensuite automatiquement. Détails : [`host/README.m
 Le mode **Bluetooth HID** fonctionne aussi sans aucun logiciel : le téléphone est vu comme une vraie
 souris + clavier Bluetooth.
 
+## Onglet Clavier
+
+* Clavier complet **AZERTY ou QWERTY** (au choix, selon le clavier de l'ordinateur ; le choix est mémorisé) :
+  touches F1–F12, Échap, navigation, flèches, Ctrl / Maj / Alt / AltGr / Win « collants »
+  (1 appui = touche suivante, 2 appuis = verrouillé).
+* Envoi de texte : en Wi-Fi tout caractère (accents, émojis) ; en Bluetooth conversion automatique AZERTY/QWERTY.
+* Touches multimédia (volume, lecture, piste suivante…).
+* Bibliothèque de plus de 150 raccourcis classés (Édition, Texte, Windows, Explorateur, Navigateur,
+  Bureautique, Présentation, macOS, touches seules) avec recherche.
+
+> Bluetooth : le descripteur HID inclut désormais les touches multimédia. Si le PC était déjà appairé,
+> supprimez « Vôlavo Mouse & Deck » des appareils Bluetooth du PC puis appairez-le à nouveau.
+
 ## Optimisations
 
 | Domaine | Avant | Maintenant |

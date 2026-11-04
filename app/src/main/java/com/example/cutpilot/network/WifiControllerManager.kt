@@ -372,6 +372,67 @@ class WifiControllerManager(context: Context) : InputSink {
         }
     }
 
+    override fun keyPhysical(modifiers: Int, usage: Int, action: Int) {
+        if (!ready) return
+        post {
+            flushMove()
+            txBuf[0] = VolavoProtocol.T_KEY_PHYS
+            txBuf[1] = modifiers.toByte()
+            txBuf[2] = usage.toByte()
+            txBuf[3] = action.toByte()
+            transmit(4)
+        }
+    }
+
+    override fun text(text: String): Boolean {
+        if (!ready) return true
+        if (text.isEmpty()) return true
+        // Split into UTF-8 chunks that fit comfortably in one datagram (code points never split).
+        val chunks = ArrayList<ByteArray>()
+        val sb = StringBuilder()
+        var size = 0
+        var i = 0
+        while (i < text.length) {
+            val cp = text.codePointAt(i)
+            val n = Character.charCount(cp)
+            val bytes = text.substring(i, i + n).toByteArray(Charsets.UTF_8).size
+            if (size + bytes > 900) {
+                chunks.add(sb.toString().toByteArray(Charsets.UTF_8))
+                sb.setLength(0)
+                size = 0
+            }
+            sb.appendCodePoint(cp)
+            size += bytes
+            i += n
+        }
+        if (sb.isNotEmpty()) chunks.add(sb.toString().toByteArray(Charsets.UTF_8))
+        post {
+            flushMove()
+            val s = socket ?: return@post
+            for (c in chunks) {
+                val pkt = ByteArray(c.size + 1)
+                pkt[0] = VolavoProtocol.T_TEXT
+                System.arraycopy(c, 0, pkt, 1, c.size)
+                try {
+                    s.send(DatagramPacket(pkt, pkt.size))
+                    sent.incrementAndGet()
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return true
+    }
+
+    override fun media(usage: Int) {
+        if (!ready) return
+        post {
+            flushMove()
+            txBuf[0] = VolavoProtocol.T_MEDIA
+            VolavoProtocol.putShort(txBuf, 1, usage)
+            transmit(3)
+        }
+    }
+
     private fun post(task: Runnable) {
         try {
             sender.execute(task)

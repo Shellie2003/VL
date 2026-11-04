@@ -15,6 +15,9 @@ object VolavoProtocol {
     const val T_KEY: Byte = 0x05
     const val T_PING: Byte = 0x06
     const val T_BYE: Byte = 0x07
+    const val T_KEY_PHYS: Byte = 0x08
+    const val T_TEXT: Byte = 0x09
+    const val T_MEDIA: Byte = 0x0A
 
     const val T_HELLO_ACK: Byte = 0x81.toByte()
     const val T_PONG: Byte = 0x86.toByte()
@@ -27,6 +30,18 @@ object VolavoProtocol {
     const val KEY_TAP = 0
     const val KEY_DOWN = 1
     const val KEY_UP = 2
+
+    /** AltGr (right Alt) bit in the HID modifier byte. */
+    const val MOD_RALT = 0x40
+
+    // HID consumer usages (media keys)
+    const val MEDIA_VOLUME_UP = 0xE9
+    const val MEDIA_VOLUME_DOWN = 0xEA
+    const val MEDIA_MUTE = 0xE2
+    const val MEDIA_PLAY_PAUSE = 0xCD
+    const val MEDIA_NEXT = 0xB5
+    const val MEDIA_PREVIOUS = 0xB6
+    const val MEDIA_STOP = 0xB7
 
     /** Scroll unit: 1/120 of a wheel notch (Windows WHEEL_DELTA convention). */
     const val NOTCH = 120

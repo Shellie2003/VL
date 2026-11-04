@@ -222,7 +222,7 @@ class VolavoServer:
         key = P.S_KEY.unpack_from
         while self._running:
             try:
-                data, addr = self.sock.recvfrom(512)
+                data, addr = self.sock.recvfrom(2048)
             except socket.timeout:
                 if self.client and time.monotonic() - self.last_seen > SESSION_TIMEOUT_S:
                     self._drop_client("délai dépassé")
@@ -259,6 +259,13 @@ class VolavoServer:
                 elif t == P.T_KEY and len(data) >= 4:
                     mods, usage, action = key(data, 1)
                     inj.key(mods, usage, action)
+                elif t == P.T_KEY_PHYS and len(data) >= 4:
+                    mods, usage, action = key(data, 1)
+                    inj.key(mods, usage, action, physical=True)
+                elif t == P.T_TEXT:
+                    inj.text(data[1:].decode("utf-8", "replace"))
+                elif t == P.T_MEDIA and len(data) >= 3:
+                    inj.media(P.S_U16.unpack_from(data, 1)[0])
                 elif t == P.T_PING:
                     self._send(bytes([P.T_PONG]) + data[1:64], addr)
                 elif t == P.T_BYE:

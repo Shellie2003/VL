@@ -44,6 +44,8 @@ import com.example.cutpilot.ui.screens.CanvaStudioScreen
 import com.example.cutpilot.ui.screens.EditorDeckScreen
 import com.example.cutpilot.ui.screens.HostCompanionScreen
 import com.example.cutpilot.ui.screens.JogWheelScreen
+import com.example.cutpilot.ui.screens.KeyboardScreen
+import com.example.cutpilot.input.HostLayout
 import com.example.cutpilot.ui.screens.SettingsScreen
 import com.example.cutpilot.ui.screens.TrackpadScreen
 import com.example.cutpilot.ui.theme.CutPilotTheme
@@ -244,6 +246,17 @@ fun CutPilotApp(
                                 }
                             },
                             onUpdateSensitivity = { vm.updateSettings(settings.copy(sensitivity = it)) }
+                        )
+                    }
+
+                    MainNavigationTab.KEYBOARD -> {
+                        KeyboardScreen(
+                            layout = if (settings.azertyHost) HostLayout.AZERTY else HostLayout.QWERTY,
+                            onLayoutChange = vm::setHostLayout,
+                            onPhysicalKey = vm::sendPhysicalKey,
+                            onTypeText = vm::typeText,
+                            onMedia = vm::sendMedia,
+                            onShortcut = vm::triggerLibraryShortcut
                         )
                     }
 

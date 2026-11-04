@@ -73,6 +73,7 @@ data class ControllerSettings(
 
 enum class MainNavigationTab {
     TRACKPAD,
+    KEYBOARD,
     JOG_WHEEL,
     CANVA,
     DECK,

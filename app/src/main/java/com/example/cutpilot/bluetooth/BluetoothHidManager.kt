@@ -76,6 +76,7 @@ class BluetoothHidManager(context: Context) : InputSink {
     private val mouseReport = ByteArray(5)
     private val keyReport = ByteArray(8)
     private val emptyKeyReport = ByteArray(8)
+    private val consumerReport = ByteArray(2)
     private var buttons = 0
     private var accScrollV = 0
     private var accScrollH = 0
@@ -154,7 +155,11 @@ class BluetoothHidManager(context: Context) : InputSink {
 
         override fun onGetReport(device: BluetoothDevice?, type: Byte, id: Byte, bufferSize: Int) {
             val proxy = hidDevice ?: return
-            val data = if (id == HidConstants.REPORT_ID_KEYBOARD) emptyKeyReport else ByteArray(mouseReport.size)
+            val data = when (id) {
+                HidConstants.REPORT_ID_KEYBOARD -> emptyKeyReport
+                HidConstants.REPORT_ID_CONSUMER -> ByteArray(2)
+                else -> ByteArray(mouseReport.size)
+            }
             safely { proxy.replyReport(device, type, id, data) }
         }
     }
@@ -328,6 +333,32 @@ class BluetoothHidManager(context: Context) : InputSink {
                 VolavoProtocol.KEY_DOWN -> sendKey(modifiers, usage)
                 else -> sendKey(0, 0)
             }
+        }
+    }
+
+    /** Bluetooth HID already sends physical positions. */
+    override fun keyPhysical(modifiers: Int, usage: Int, action: Int) = key(modifiers, usage, action)
+
+    /** HID keyboards cannot send Unicode: the caller maps characters to key strokes. */
+    override fun text(text: String): Boolean = false
+
+    override fun media(usage: Int) {
+        if (!isReady) return
+        handler.post {
+            flushMove()
+            sendConsumer(usage)
+            sendConsumer(0)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun sendConsumer(usage: Int) {
+        val proxy = hidDevice ?: return
+        val device = connectedDevice ?: return
+        consumerReport[0] = usage.toByte()
+        consumerReport[1] = (usage shr 8).toByte()
+        if (safely { proxy.sendReport(device, HidConstants.REPORT_ID_CONSUMER.toInt(), consumerReport) } == true) {
+            sent.incrementAndGet()
         }
     }
 

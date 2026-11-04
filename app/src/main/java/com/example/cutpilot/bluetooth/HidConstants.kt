@@ -4,6 +4,7 @@ object HidConstants {
     // Report IDs
     const val REPORT_ID_MOUSE: Byte = 1
     const val REPORT_ID_KEYBOARD: Byte = 2
+    const val REPORT_ID_CONSUMER: Byte = 3
 
     // Mouse Buttons Mask
     const val MOUSE_BUTTON_NONE = 0
@@ -111,6 +112,10 @@ object HidConstants {
             "PAGEUP", "PGUP" -> KEY_PAGE_UP
             "PAGEDOWN", "PGDN" -> KEY_PAGE_DOWN
             "INSERT", "INSER" -> KEY_INSERT
+            "PRINTSCREEN", "IMPR", "IMPRÉCRAN" -> 0x46.toByte()
+            "MENU", "APPLICATION" -> 0x65.toByte()
+            "CAPSLOCK", "VERRMAJ" -> 0x39.toByte()
+            "PAUSE" -> 0x48.toByte()
             "+", "=" -> KEY_EQUAL
             "-" -> KEY_MINUS
             "[" -> KEY_LEFT_BRACKET
@@ -231,6 +236,20 @@ object HidConstants {
         0x05.toByte(), 0x07.toByte(), // USAGE_PAGE (Keyboard)
         0x19.toByte(), 0x00.toByte(), // USAGE_MINIMUM (Reserved)
         0x29.toByte(), 0x65.toByte(), // USAGE_MAXIMUM (Keyboard Application)
+        0x81.toByte(), 0x00.toByte(), // INPUT (Data,Ary,Abs)
+        0xC0.toByte(), // END_COLLECTION
+
+        // Consumer Control (Report ID 3): volume, mute, play/pause, next, previous
+        0x05.toByte(), 0x0C.toByte(), // USAGE_PAGE (Consumer Devices)
+        0x09.toByte(), 0x01.toByte(), // USAGE (Consumer Control)
+        0xA1.toByte(), 0x01.toByte(), // COLLECTION (Application)
+        0x85.toByte(), REPORT_ID_CONSUMER, // REPORT_ID (3)
+        0x15.toByte(), 0x00.toByte(), // LOGICAL_MINIMUM (0)
+        0x26.toByte(), 0xFF.toByte(), 0x03.toByte(), // LOGICAL_MAXIMUM (0x3FF)
+        0x19.toByte(), 0x00.toByte(), // USAGE_MINIMUM (0)
+        0x2A.toByte(), 0xFF.toByte(), 0x03.toByte(), // USAGE_MAXIMUM (0x3FF)
+        0x75.toByte(), 0x10.toByte(), // REPORT_SIZE (16)
+        0x95.toByte(), 0x01.toByte(), // REPORT_COUNT (1)
         0x81.toByte(), 0x00.toByte(), // INPUT (Data,Ary,Abs)
         0xC0.toByte()  // END_COLLECTION
     )

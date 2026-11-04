@@ -23,7 +23,12 @@ class PairingStore(context: Context) {
             .getOrDefault(ConnectionMode.BLUETOOTH_HID)
         set(value) = prefs.edit().putString(KEY_MODE, value.name).apply()
 
+    var azertyHost: Boolean
+        get() = prefs.getBoolean(KEY_AZERTY, false)
+        set(value) = prefs.edit().putBoolean(KEY_AZERTY, value).apply()
+
     private companion object {
+        const val KEY_AZERTY = "azerty_host"
         const val KEY_URI = "last_pairing_uri"
         const val KEY_BT = "last_bt_host"
         const val KEY_MODE = "connection_mode"

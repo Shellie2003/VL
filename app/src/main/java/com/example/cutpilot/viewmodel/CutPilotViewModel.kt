@@ -9,7 +9,10 @@ import com.example.cutpilot.bluetooth.BluetoothHidManager
 import com.example.cutpilot.bluetooth.HidConstants
 import com.example.cutpilot.data.DefaultPresets
 import com.example.cutpilot.data.PairingStore
+import com.example.cutpilot.data.LibraryShortcut
+import com.example.cutpilot.input.HostLayout
 import com.example.cutpilot.input.InputSink
+import com.example.cutpilot.input.KeyboardLayouts
 import com.example.cutpilot.input.PointerProcessor
 import com.example.cutpilot.network.PairingInfo
 import com.example.cutpilot.network.VolavoProtocol
@@ -105,7 +108,7 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     val latencyInfo: StateFlow<LatencyInfo> = _latencyInfo.asStateFlow()
 
     // Settings
-    private val _settings = MutableStateFlow(ControllerSettings())
+    private val _settings = MutableStateFlow(ControllerSettings(azertyHost = pairingStore.azertyHost))
     val settings: StateFlow<ControllerSettings> = _settings.asStateFlow()
 
     // Software Profiles
@@ -309,7 +312,66 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun updateSettings(newSettings: ControllerSettings) {
+        if (newSettings.azertyHost != _settings.value.azertyHost) pairingStore.azertyHost = newSettings.azertyHost
         _settings.value = newSettings
+    }
+
+    // =========================================================================
+    // Full keyboard (Clavier tab)
+    // =========================================================================
+    val hostLayout: HostLayout
+        get() = if (_settings.value.azertyHost) HostLayout.AZERTY else HostLayout.QWERTY
+
+    fun setHostLayout(layout: HostLayout) {
+        updateSettings(_settings.value.copy(azertyHost = layout == HostLayout.AZERTY))
+        triggerHapticTick()
+    }
+
+    /** A key of the on-screen keyboard: physical position, labels already follow the PC layout. */
+    fun sendPhysicalKey(modifiers: Int, usage: Int) {
+        if (usage == 0 && modifiers == 0) return
+        triggerHapticTick()
+        sink()?.keyPhysical(modifiers, usage, VolavoProtocol.KEY_TAP)
+    }
+
+    /** Types [text] on the computer (any character over Wi-Fi; layout-mapped over Bluetooth). */
+    fun typeText(text: String, pressEnter: Boolean) {
+        if (text.isEmpty() && !pressEnter) return
+        triggerHapticClick()
+        when (_connectionMode.value) {
+            ConnectionMode.WIFI -> {
+                wifiController.text(if (pressEnter) text + "\n" else text)
+            }
+            ConnectionMode.BLUETOOTH_HID -> {
+                val layout = hostLayout
+                var skipped = 0
+                val full = if (pressEnter) text + "\n" else text
+                for (ch in full) {
+                    val strokes = KeyboardLayouts.strokesFor(ch, layout)
+                    if (strokes == null) {
+                        skipped++
+                        continue
+                    }
+                    for (k in strokes) bluetoothHid.key(k.modifiers, k.usage, VolavoProtocol.KEY_TAP)
+                }
+                if (skipped > 0) {
+                    _userMessages.tryEmit("$skipped caractère(s) impossible(s) en Bluetooth ($layout) — utilisez le Wi-Fi pour tout envoyer.")
+                }
+            }
+            ConnectionMode.SIMULATOR -> {}
+        }
+        logAction("Texte envoyé (${text.length} caractères)")
+    }
+
+    fun sendMedia(usage: Int) {
+        triggerHapticClick()
+        sink()?.media(usage)
+    }
+
+    fun triggerLibraryShortcut(shortcut: LibraryShortcut) {
+        triggerHapticClick()
+        sendKey(shortcut.modifiers, shortcut.key)
+        logAction("Raccourci : ${shortcut.label} (${shortcut.combo})")
     }
 
     fun toggleSniperMode() {
@@ -419,9 +481,10 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
 
     /** Sends a key through the active transport (layout-aware for Bluetooth HID). */
     private fun sendKey(modifiers: Set<ModifierKey>, keySymbol: String) {
-        val usage = HidConstants.symbolToHidCode(keySymbol).toInt() and 0xFF
-        if (usage == 0) return
-        sendKeyUsage(HidConstants.modifierBits(modifiers), usage)
+        val usage = if (keySymbol.isEmpty()) 0 else HidConstants.symbolToHidCode(keySymbol).toInt() and 0xFF
+        val mods = HidConstants.modifierBits(modifiers)
+        if (usage == 0 && (mods == 0 || keySymbol.isNotEmpty())) return // unknown key: send nothing
+        sendKeyUsage(mods, usage)
     }
 
     private fun sendKeyUsage(mods: Int, usage: Int) {
