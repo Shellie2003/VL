@@ -112,7 +112,13 @@ class BluetoothHidManager(context: Context) : InputSink {
         }
     }
 
-    private val hidCallback = object : BluetoothHidDevice.Callback() {
+    /** Bluetooth HID Device exists only on Android 9+ (API 28): created lazily, never touched before. */
+    private val hidSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+
+    private val hidCallback by lazy { createHidCallback() }
+
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.P)
+    private fun createHidCallback() = object : BluetoothHidDevice.Callback() {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             Log.d(tag, "onAppStatusChanged registered=$registered")
             _isRegistered.value = registered
@@ -185,6 +191,10 @@ class BluetoothHidManager(context: Context) : InputSink {
         if (!adapter.isEnabled) {
             _errorMessage.value = "Veuillez activer le Bluetooth."
         }
+        if (!hidSupported) {
+            _errorMessage.value = "Le mode souris Bluetooth nécessite Android 9 ou plus récent. Utilisez le Wi-Fi."
+            return
+        }
         if (proxyRequested) return
         try {
             proxyRequested = adapter.getProfileProxy(appContext, profileListener, BluetoothProfile.HID_DEVICE)
@@ -197,6 +207,7 @@ class BluetoothHidManager(context: Context) : InputSink {
 
     @SuppressLint("MissingPermission")
     private fun registerHidApp() {
+        if (!hidSupported) return
         val proxy = hidDevice ?: return
         try {
             val sdp = BluetoothHidDeviceAppSdpSettings(

@@ -37,6 +37,9 @@ android {
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
+      // v1 (JAR) + v2: some vendor installers (MIUI) reject v2-only APKs.
+      enableV1Signing = true
+      enableV2Signing = true
     }
   }
 

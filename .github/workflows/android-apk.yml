@@ -47,7 +47,8 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           APK=app/build/outputs/apk/debug/app-debug.apk
           ls -la "$APK"
-          "$BT/apksigner" verify --verbose --print-certs "$APK"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | grep -E "Verified using|Signer" | head -8
+          "$BT/apksigner" verify --verbose "$APK" | grep -q "v1 scheme (JAR signing): true" || { echo "::error::Signature v1 absente"; exit 1; }
           "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdk|testOnly|native-code|application-debuggable|launchable" || true
           if "$BT/aapt2" dump badging "$APK" | grep -q "testOnly"; then echo "::error::APK marqué testOnly"; exit 1; fi
           mkdir -p dist && cp "$APK" dist/Volavo.apk
@@ -68,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: [26, 34]
+        api-level: [26, 29, 34]
     steps:
       - uses: actions/checkout@v4
 
