@@ -6,30 +6,37 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val StudioDarkColorScheme = darkColorScheme(
-    primary = NeonCyan,
-    onPrimary = DarkBg,
-    primaryContainer = SurfaceContainerHighDark,
-    onPrimaryContainer = NeonCyan,
-    secondary = AmberAccent,
-    onSecondary = DarkBg,
-    secondaryContainer = AmberDim,
-    onSecondaryContainer = AmberAccent,
-    tertiary = PurpleAccent,
-    onTertiary = DarkBg,
-    background = DarkBg,
-    onBackground = TextPrimary,
-    surface = SurfaceDark,
-    onSurface = TextPrimary,
-    surfaceVariant = SurfaceContainerDark,
-    onSurfaceVariant = TextSecondary,
-    outline = BorderDark,
-    error = RazorRed,
-    onError = DarkBg
+    primary = Primary,
+    onPrimary = Bg,
+    primaryContainer = PrimarySoft,
+    onPrimaryContainer = Primary,
+    secondary = Accent,
+    onSecondary = Bg,
+    secondaryContainer = Color(0x292DD4BF),
+    onSecondaryContainer = Accent,
+    tertiary = Warning,
+    onTertiary = Bg,
+    background = Bg,
+    onBackground = OnBg,
+    surface = Surface1,
+    onSurface = OnBg,
+    surfaceVariant = Surface2,
+    onSurfaceVariant = OnBgMuted,
+    surfaceContainerLowest = Bg,
+    surfaceContainerLow = Surface1,
+    surfaceContainer = Surface2,
+    surfaceContainerHigh = Surface3,
+    surfaceContainerHighest = Surface3,
+    outline = Outline,
+    outlineVariant = Surface3,
+    error = Danger,
+    onError = Bg
 )
 
 @Composable
@@ -54,6 +61,7 @@ fun CutPilotTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = VolavoShapes,
         content = content
     )
 }

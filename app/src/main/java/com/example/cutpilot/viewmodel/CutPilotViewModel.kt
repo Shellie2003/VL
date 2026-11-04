@@ -77,7 +77,11 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     private val deviceName: String = (Build.MODEL ?: "Android").take(40)
 
     // Navigation & Connection
-    private val _currentTab = MutableStateFlow(MainNavigationTab.TRACKPAD)
+    // First launch (nothing paired yet): open the connection screen directly.
+    private val _currentTab = MutableStateFlow(
+        if (pairingStore.lastPairing == null && pairingStore.lastBluetoothHost == null) MainNavigationTab.CONNECTION
+        else MainNavigationTab.TRACKPAD
+    )
     val currentTab: StateFlow<MainNavigationTab> = _currentTab.asStateFlow()
 
     private val _connectionMode = MutableStateFlow(pairingStore.connectionMode)

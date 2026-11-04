@@ -119,23 +119,28 @@ fun TrackpadScreen(
                 .clip(RoundedCornerShape(12.dp))
                 .background(SurfaceDark)
                 .border(1.dp, SurfaceContainerHighDark, RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+                .padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = activeProfileName,
-                color = NeonCyan,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Profil", color = TextTertiary, fontSize = 11.sp)
+                Text(
+                    text = activeProfileName,
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                 // Razor Cut quick trigger
                 IconButton(
                     onClick = onQuickCut,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(RazorRed.copy(alpha = 0.15f))
                         .testTag("quick_cut_btn")
@@ -152,7 +157,7 @@ fun TrackpadScreen(
                 IconButton(
                     onClick = onTogglePlayPause,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(if (isPlaying) EmeraldGreen.copy(alpha = 0.25f) else SurfaceContainerHighDark)
                         .testTag("quick_play_pause_btn")
@@ -168,7 +173,7 @@ fun TrackpadScreen(
                 // Zoom Out
                 IconButton(
                     onClick = onZoomOut,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ZoomOut,
@@ -181,7 +186,7 @@ fun TrackpadScreen(
                 // Zoom In
                 IconButton(
                     onClick = onZoomIn,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ZoomIn,
@@ -194,7 +199,7 @@ fun TrackpadScreen(
                 // Undo
                 IconButton(
                     onClick = onQuickUndo,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Undo,
@@ -408,7 +413,7 @@ fun TrackpadScreen(
                             .padding(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "🎯 MODE PRÉCISION CHIRURGICALE ACTIF (1:1 PIXEL)",
+                            text = "Mode précision actif",
                             color = NeonCyan,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
@@ -423,19 +428,21 @@ fun TrackpadScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Surface Tactile Haute Résolution",
+                            text = "Glissez pour déplacer le curseur",
                             color = TextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "1 doigt : curseur • Tap : clic • Tap + glisser : déplacer",
+                            text = "Touchez : clic · Double-touchez : double-clic\nTouchez puis glissez : sélectionner / déplacer",
                             color = TextTertiary,
-                            fontSize = 11.sp
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "2 doigts : défiler / clic droit • 3 doigts : clic milieu",
+                            text = "2 doigts : défiler ou clic droit · 3 doigts : clic milieu",
                             color = TextTertiary,
                             fontSize = 10.sp
                         )
@@ -505,21 +512,9 @@ fun TrackpadScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp),
+                .height(56.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Left button: real press / release (hold it and drag with another finger)
-            PressHoldButton(
-                title = "CLIC GAUCHE",
-                subtitle = "Maintenir = glisser",
-                onPress = { buttonCb(HidConstants.MOUSE_BUTTON_LEFT, true) },
-                onRelease = { buttonCb(HidConstants.MOUSE_BUTTON_LEFT, false) },
-                modifier = Modifier
-                    .weight(1.5f)
-                    .fillMaxHeight()
-                    .testTag("left_click_button")
-            )
-
             // Drag lock: keeps the left button held across several swipes
             Button(
                 onClick = onToggleDragLock,
@@ -540,15 +535,15 @@ fun TrackpadScreen(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = if (isDragLocked) "GLISSEMENT ACTIF" else "VERROU GLISSER",
+                        text = if (isDragLocked) "Relâcher" else "Maintenir le clic",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 9.sp
+                        fontSize = 12.sp
                     )
                 }
             }
 
             PressHoldButton(
-                title = "CLIC DROIT",
+                title = "Clic droit",
                 subtitle = "Menu contextuel",
                 onPress = { buttonCb(HidConstants.MOUSE_BUTTON_RIGHT, true) },
                 onRelease = { buttonCb(HidConstants.MOUSE_BUTTON_RIGHT, false) },
@@ -592,8 +587,8 @@ private fun PressHoldButton(
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
-            Text(subtitle, fontSize = 9.sp, color = TextSecondary)
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextPrimary)
+            Text(subtitle, fontSize = 11.sp, color = TextSecondary)
         }
     }
 }

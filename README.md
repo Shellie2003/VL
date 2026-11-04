@@ -19,6 +19,18 @@ Le téléphone se reconnecte ensuite automatiquement. Détails : [`host/README.m
 Le mode **Bluetooth HID** fonctionne aussi sans aucun logiciel : le téléphone est vu comme une vraie
 souris + clavier Bluetooth.
 
+## Interface
+
+* Navigation par le **menu ☰ en haut à droite** (plus de barre du bas : toute la hauteur sert au trackpad).
+* Barre du haut : titre de l'écran + état de la connexion (touchez-le pour gérer la connexion),
+  bouton **mode précision** sur le trackpad et la molette.
+* Bandeau « Aucun ordinateur connecté » avec un bouton **Connecter** quand rien n'est relié.
+* Au premier lancement, l'app s'ouvre directement sur l'écran de connexion.
+* Palette sombre « minuit » (violet / turquoise) conforme WCAG AA, nouvelle icône, cibles tactiles ≥ 48 dp.
+* Trackpad : plus de bouton « clic gauche » (toucher = clic, double-toucher = double-clic,
+  toucher puis glisser = sélectionner / déplacer). Restent « Maintenir le clic » (glisser sur plusieurs
+  mouvements) et « Clic droit ».
+
 ## Onglet Clavier
 
 * Clavier complet **AZERTY ou QWERTY** (au choix, selon le clavier de l'ordinateur ; le choix est mémorisé) :

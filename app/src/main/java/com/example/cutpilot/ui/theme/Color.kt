@@ -2,33 +2,60 @@ package com.example.cutpilot.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// CutPilot Pro Studio Palette
-val DarkBg = Color(0xFF0F1015)
-val SurfaceDark = Color(0xFF161822)
-val SurfaceContainerDark = Color(0xFF1F2230)
-val SurfaceContainerHighDark = Color(0xFF2A2D3F)
-val BorderDark = Color(0xFF353950)
+// =============================================================================
+// Vôlavo design tokens — dark "midnight" palette.
+// Every text/background pair below passes WCAG AA (≥ 4.5:1) on Bg and Surface.
+// =============================================================================
 
-val NeonCyan = Color(0xFF00E5FF)
-val NeonCyanDim = Color(0x3300E5FF)
-val AmberAccent = Color(0xFFFFB300)
-val AmberDim = Color(0x33FFB300)
-val RazorRed = Color(0xFFFF4D4D)
-val RazorRedDim = Color(0x33FF4D4D)
-val EmeraldGreen = Color(0xFF00E676)
-val EmeraldGreenDim = Color(0x3300E676)
-val PurpleAccent = Color(0xFFA855F7)
-val PurpleDim = Color(0x33A855F7)
-val ElectricBlue = Color(0xFF3B82F6)
+// Surfaces (elevation goes up = lighter)
+val Bg = Color(0xFF0D1017)
+val Surface1 = Color(0xFF151922)
+val Surface2 = Color(0xFF1C2130)
+val Surface3 = Color(0xFF262C3D)
+val Outline = Color(0xFF323A4F)
 
-val TextPrimary = Color(0xFFF1F5F9)
-val TextSecondary = Color(0xFF94A3B8)
-val TextTertiary = Color(0xFF64748B)
+// Brand & semantic colors
+val Primary = Color(0xFF8B7CFF)      // Vôlavo violet — main actions, selection
+val PrimarySoft = Color(0x298B7CFF)  // 16 % tint for selected backgrounds
+val Accent = Color(0xFF2DD4BF)       // teal — secondary highlights
+val Success = Color(0xFF3DDC97)      // connected, playing
+val Warning = Color(0xFFFFB547)      // modes, attention
+val Danger = Color(0xFFFF6B6B)       // cut, delete, errors
+val Info = Color(0xFF60A5FA)
 
-val Purple80 = NeonCyan
-val PurpleGrey80 = Color(0xFF90A4AE)
-val Pink80 = AmberAccent
+// Text
+val OnBg = Color(0xFFECEFF5)
+val OnBgMuted = Color(0xFFA7B0C2)
+val OnBgSubtle = Color(0xFF8590A6)
 
-val Purple40 = Color(0xFF0097A7)
-val PurpleGrey40 = Color(0xFF455A64)
-val Pink40 = Color(0xFFFF8F00)
+// -----------------------------------------------------------------------------
+// Legacy names used across the screens, mapped onto the new tokens.
+// -----------------------------------------------------------------------------
+val DarkBg = Bg
+val SurfaceDark = Surface1
+val SurfaceContainerDark = Surface2
+val SurfaceContainerHighDark = Surface3
+val BorderDark = Outline
+
+val NeonCyan = Primary
+val NeonCyanDim = PrimarySoft
+val AmberAccent = Warning
+val AmberDim = Color(0x29FFB547)
+val RazorRed = Danger
+val RazorRedDim = Color(0x29FF6B6B)
+val EmeraldGreen = Success
+val EmeraldGreenDim = Color(0x293DDC97)
+val PurpleAccent = Accent
+val PurpleDim = Color(0x292DD4BF)
+val ElectricBlue = Info
+
+val TextPrimary = OnBg
+val TextSecondary = OnBgMuted
+val TextTertiary = OnBgSubtle
+
+val Purple80 = Primary
+val PurpleGrey80 = OnBgMuted
+val Pink80 = Warning
+val Purple40 = Color(0xFF5B4BD6)
+val PurpleGrey40 = Surface3
+val Pink40 = Color(0xFFE09A2E)

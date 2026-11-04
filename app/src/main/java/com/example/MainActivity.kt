@@ -21,6 +21,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -38,8 +39,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.example.cutpilot.model.MainNavigationTab
-import com.example.cutpilot.ui.components.BottomNavBar
-import com.example.cutpilot.ui.components.TopStudioBar
+import com.example.cutpilot.model.ConnectionMode
+import com.example.cutpilot.ui.components.ConnectionBanner
+import com.example.cutpilot.ui.components.VolavoTopBar
 import com.example.cutpilot.ui.screens.CanvaStudioScreen
 import com.example.cutpilot.ui.screens.EditorDeckScreen
 import com.example.cutpilot.ui.screens.HostCompanionScreen
@@ -180,22 +182,16 @@ fun CutPilotApp(
             .background(DarkBg),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            TopStudioBar(
+            VolavoTopBar(
+                currentTab = currentTab,
                 connectionMode = connectionMode,
                 connectionStatus = connectionStatus,
                 connectedDeviceName = connectedDeviceName,
                 latencyInfo = latencyInfo,
-                batteryInfo = batteryInfo,
-                isSniperMode = settings.sniperMode,
-                onToggleSniperMode = { vm.toggleSniperMode() },
-                onOpenConnection = { vm.selectTab(MainNavigationTab.CONNECTION) },
+                isPrecisionMode = settings.sniperMode,
+                onTogglePrecision = { vm.toggleSniperMode() },
+                onNavigate = { vm.selectTab(it) },
                 modifier = Modifier.statusBarsPadding()
-            )
-        },
-        bottomBar = {
-            BottomNavBar(
-                currentTab = currentTab,
-                onTabSelected = { vm.selectTab(it) }
             )
         }
     ) { innerPadding ->
@@ -205,8 +201,20 @@ fun CutPilotApp(
                 .padding(innerPadding)
                 .background(DarkBg)
         ) {
+            val connectionError by vm.connectionError.collectAsStateWithLifecycle()
+            val showBanner = connectionMode != ConnectionMode.SIMULATOR &&
+                currentTab != MainNavigationTab.CONNECTION && currentTab != MainNavigationTab.SETTINGS
+            Column(Modifier.fillMaxSize()) {
+            if (showBanner) {
+                ConnectionBanner(
+                    connectionStatus = connectionStatus,
+                    errorMessage = connectionError,
+                    onConnect = { vm.selectTab(MainNavigationTab.CONNECTION) }
+                )
+            }
             AnimatedContent(
                 targetState = currentTab,
+                modifier = Modifier.weight(1f),
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "screen_transition"
             ) { targetTab ->
@@ -314,7 +322,6 @@ fun CutPilotApp(
                     MainNavigationTab.CONNECTION -> {
                         val simState by vm.simState.collectAsStateWithLifecycle()
                         val pairedHost by vm.pairedHost.collectAsStateWithLifecycle()
-                        val connectionError by vm.connectionError.collectAsStateWithLifecycle()
                         val localIp = remember { vm.getLocalWifiIp() }
                         HostCompanionScreen(
                             connectionMode = connectionMode,
@@ -343,6 +350,7 @@ fun CutPilotApp(
                         )
                     }
                 }
+            }
             }
         }
     }
