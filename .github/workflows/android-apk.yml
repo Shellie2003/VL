@@ -42,16 +42,20 @@ jobs:
       - name: Compiler l'APK
         run: gradle :app:assembleDebug --stacktrace --no-configuration-cache
 
-      - name: Vérifier l'APK (signature, manifeste)
+      - name: Signer (v1 + v2 + v3) et vérifier l'APK
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          APK=app/build/outputs/apk/debug/app-debug.apk
-          ls -la "$APK"
-          "$BT/apksigner" verify --verbose --print-certs "$APK" | grep -E "Verified using|Signer" | head -8
-          "$BT/apksigner" verify --verbose "$APK" | grep -q "v1 scheme (JAR signing): true" || { echo "::error::Signature v1 absente"; exit 1; }
-          "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdk|testOnly|native-code|application-debuggable|launchable" || true
-          if "$BT/aapt2" dump badging "$APK" | grep -q "testOnly"; then echo "::error::APK marqué testOnly"; exit 1; fi
-          mkdir -p dist && cp "$APK" dist/Volavo.apk
+          mkdir -p dist
+          # Signature v1 forcée : certains installateurs constructeurs (MIUI) l'exigent.
+          "$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+            --min-sdk-version 24 \
+            --out dist/Volavo.apk app/build/outputs/apk/debug/app-debug.apk
+          "$BT/apksigner" verify --verbose --print-certs dist/Volavo.apk | tee verify.log | grep -E "Verified using|Signer #1|certificate DN"
+          grep -q "v1 scheme (JAR signing): true" verify.log || { echo "::error::Signature v1 absente"; exit 1; }
+          "$BT/aapt2" dump badging dist/Volavo.apk | grep -E "^package|SdkVersion|targetSdk|testOnly|native-code|launchable" || true
+          if "$BT/aapt2" dump badging dist/Volavo.apk | grep -q "testOnly"; then echo "::error::APK marqué testOnly"; exit 1; fi
 
       - name: Publier l'APK
         uses: actions/upload-artifact@v4
