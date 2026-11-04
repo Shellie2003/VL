@@ -58,3 +58,37 @@ jobs:
           name: Volavo-APK
           path: dist/Volavo.apk
           if-no-files-found: error
+
+  # Installe réellement l'APK sur un émulateur et lance l'app : donne le code
+  # d'erreur exact (INSTALL_FAILED_...) ou détecte un plantage au démarrage.
+  install-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [26, 34]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Volavo-APK
+          path: dist
+
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Installer et lancer sur l'émulateur (API ${{ matrix.api-level }})
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash ci/emulator-install-test.sh dist/Volavo.apk
