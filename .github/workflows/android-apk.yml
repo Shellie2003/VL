@@ -3,9 +3,9 @@ name: Android APK
 on:
   push:
     branches: [main, master, "claude/**"]
-    paths-ignore: ["host/**", "**.md"]
+    paths-ignore: ["host/**", "**.md", ".github/workflows/host-app.yml"]
   pull_request:
-    paths-ignore: ["host/**", "**.md"]
+    paths-ignore: ["host/**", "**.md", ".github/workflows/host-app.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -35,18 +35,26 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
-      - name: Debug keystore (non versionné)
-        run: |
-          keytool -genkeypair -v -keystore debug.keystore -storepass android \
-            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
-            -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+      # Clé de signature FIXE : chaque nouvel APK peut s'installer par-dessus le précédent.
+      - name: Clé de signature debug
+        run: cp ci/volavo-debug.keystore debug.keystore
 
       - name: Compiler l'APK
         run: gradle :app:assembleDebug --stacktrace --no-configuration-cache
 
+      - name: Vérifier l'APK (signature, manifeste)
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          ls -la "$APK"
+          "$BT/apksigner" verify --verbose --print-certs "$APK"
+          "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdk|testOnly|native-code|application-debuggable|launchable" || true
+          if "$BT/aapt2" dump badging "$APK" | grep -q "testOnly"; then echo "::error::APK marqué testOnly"; exit 1; fi
+          mkdir -p dist && cp "$APK" dist/Volavo.apk
+
       - name: Publier l'APK
         uses: actions/upload-artifact@v4
         with:
-          name: volavo-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: Volavo-APK
+          path: dist/Volavo.apk
           if-no-files-found: error
