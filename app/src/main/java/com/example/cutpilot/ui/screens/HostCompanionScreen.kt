@@ -123,17 +123,17 @@ fun HostCompanionScreen(
             Tab(
                 selected = selectedSubTab == 0,
                 onClick = { selectedSubTab = 0 },
-                text = { Text("Appairage Rapide", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Appairer", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             )
             Tab(
                 selected = selectedSubTab == 1,
                 onClick = { selectedSubTab = 1 },
-                text = { Text("Simulateur PC", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Simulateur", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             )
             Tab(
                 selected = selectedSubTab == 2,
                 onClick = { selectedSubTab = 2 },
-                text = { Text("Logiciel PC", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Logiciel PC", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             )
         }
 

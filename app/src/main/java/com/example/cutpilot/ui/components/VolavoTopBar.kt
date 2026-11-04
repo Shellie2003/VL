@@ -32,8 +32,6 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SyncProblem
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -43,6 +41,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -232,44 +231,51 @@ fun ConnectionBanner(
 ) {
     if (connectionStatus == ConnectionStatus.CONNECTED) return
     val connecting = connectionStatus == ConnectionStatus.CONNECTING || connectionStatus == ConnectionStatus.SCANNING
+    // Compact (one line, ~48 dp): explains why nothing happens and offers the fix.
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(Surface2)
+            .clickable(enabled = !connecting, onClick = onConnect)
     ) {
         Row(
-            modifier = Modifier.padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier
+                .height(48.dp)
+                .padding(start = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 Icons.Default.SyncProblem,
                 contentDescription = null,
                 tint = if (connecting) Warning else Danger,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     if (connecting) "Connexion à l'ordinateur…" else "Aucun ordinateur connecté",
                     style = MaterialTheme.typography.labelLarge,
-                    color = OnBg
-                )
-                Text(
-                    errorMessage ?: if (connecting) "Patientez quelques secondes." else "Les gestes ne sont envoyés nulle part.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OnBgMuted,
-                    maxLines = 2,
+                    color = OnBg,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (errorMessage != null) {
+                    Text(
+                        errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnBgMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             if (!connecting) {
-                Button(
+                TextButton(
                     onClick = onConnect,
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary, contentColor = Bg),
                     modifier = Modifier.testTag("banner_connect_button")
-                ) { Text("Connecter", fontWeight = FontWeight.SemiBold) }
+                ) { Text("Connecter", color = Primary, fontWeight = FontWeight.SemiBold) }
             }
         }
         if (connecting) {
