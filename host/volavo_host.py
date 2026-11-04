@@ -490,7 +490,15 @@ def parse_args(argv=None):
     return ap.parse_args(argv)
 
 
+def _ensure_std_streams():
+    """Windowed executables (PyInstaller --windowed) have no console: sys.stdout is None."""
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
+
+
 def main(argv=None):
+    _ensure_std_streams()
     HostApp(parse_args(argv)).run()
 
 
