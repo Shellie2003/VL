@@ -52,8 +52,11 @@ jobs:
             --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
             --min-sdk-version 24 \
             --out dist/Volavo.apk app/build/outputs/apk/debug/app-debug.apk
-          "$BT/apksigner" verify --verbose --print-certs dist/Volavo.apk | tee verify.log | grep -E "Verified using|Signer #1|certificate DN"
+          "$BT/apksigner" verify --verbose --print-certs dist/Volavo.apk | grep -E "Verified using|certificate DN"
+          # Vérifie la v1 comme un ancien installateur (min-sdk 21) le ferait.
+          "$BT/apksigner" verify --verbose --min-sdk-version 21 dist/Volavo.apk | tee verify.log | grep "v1 scheme"
           grep -q "v1 scheme (JAR signing): true" verify.log || { echo "::error::Signature v1 absente"; exit 1; }
+          unzip -l dist/Volavo.apk | grep -E "META-INF/.*\.(SF|RSA)"
           "$BT/aapt2" dump badging dist/Volavo.apk | grep -E "^package|SdkVersion|targetSdk|testOnly|native-code|launchable" || true
           if "$BT/aapt2" dump badging dist/Volavo.apk | grep -q "testOnly"; then echo "::error::APK marqué testOnly"; exit 1; fi
 
