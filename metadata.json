@@ -1,0 +1,6 @@
+{
+  "name": "Vôlavo",
+  "description": "Transforme votre téléphone en souris sans fil et console de montage vidéo et design Canva haute précision via Bluetooth HID (sans logiciel hôte) ou Wi-Fi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

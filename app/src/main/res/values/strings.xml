@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Vôlavo</string>
+    <string name="title_trackpad">Trackpad</string>
+    <string name="title_jog_wheel">Jog / Shuttle</string>
+    <string name="title_editor_deck">Raccourcis</string>
+    <string name="title_canva">Canva Studio</string>
+    <string name="title_connection">Connexion</string>
+    <string name="title_settings">Réglages</string>
+</resources>
