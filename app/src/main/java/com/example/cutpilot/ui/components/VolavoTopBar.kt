@@ -133,7 +133,21 @@ fun VolavoTopBar(
                 .padding(vertical = 4.dp)
                 .testTag("connection_status_badge")
         ) {
-            Text(dest.title, style = MaterialTheme.typography.titleLarge, color = OnBg, maxLines = 1)
+            // App name + current screen (users always know where they are)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Vôlavo", style = MaterialTheme.typography.titleLarge, color = OnBg, maxLines = 1)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    dest.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Primary,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(PrimarySoft)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StatusDot(connectionStatus)
                 Spacer(Modifier.width(6.dp))

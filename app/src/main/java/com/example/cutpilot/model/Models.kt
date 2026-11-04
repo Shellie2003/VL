@@ -68,7 +68,9 @@ data class ControllerSettings(
     val highContrastPointers: Boolean = true,
     /** Bluetooth HID sends physical key positions: remap letters for an AZERTY computer. */
     val azertyHost: Boolean = false,
-    val scrollSpeed: Float = 1.0f
+    val scrollSpeed: Float = 1.0f,
+    /** Keyboard shown in landscape, full width like a real keyboard ("piano" mode). */
+    val keyboardLandscape: Boolean = false
 )
 
 enum class MainNavigationTab {

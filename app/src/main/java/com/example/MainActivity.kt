@@ -3,6 +3,7 @@ package com.example
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -35,6 +36,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -74,6 +78,24 @@ class MainActivity : ComponentActivity() {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     } else {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                }
+
+                // Keyboard "piano" mode: landscape + full screen, only on the keyboard screen
+                val tab by vm.currentTab.collectAsStateWithLifecycle()
+                val pianoMode = tab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape
+                LaunchedEffect(pianoMode) {
+                    requestedOrientation = if (pianoMode) {
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    } else {
+                        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    }
+                    val insets = WindowCompat.getInsetsController(window, window.decorView)
+                    if (pianoMode) {
+                        insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        insets.hide(WindowInsetsCompat.Type.systemBars())
+                    } else {
+                        insets.show(WindowInsetsCompat.Type.systemBars())
                     }
                 }
 
@@ -182,7 +204,7 @@ fun CutPilotApp(
             .background(DarkBg),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            VolavoTopBar(
+            if (!(currentTab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape)) VolavoTopBar(
                 currentTab = currentTab,
                 connectionMode = connectionMode,
                 connectionStatus = connectionStatus,
@@ -203,7 +225,8 @@ fun CutPilotApp(
         ) {
             val connectionError by vm.connectionError.collectAsStateWithLifecycle()
             val showBanner = connectionMode != ConnectionMode.SIMULATOR &&
-                currentTab != MainNavigationTab.CONNECTION && currentTab != MainNavigationTab.SETTINGS
+                currentTab != MainNavigationTab.CONNECTION && currentTab != MainNavigationTab.SETTINGS &&
+                !(currentTab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape)
             Column(Modifier.fillMaxSize()) {
             if (showBanner) {
                 ConnectionBanner(
@@ -253,7 +276,8 @@ fun CutPilotApp(
                                     vm.triggerShortcut(it)
                                 }
                             },
-                            onUpdateSensitivity = { vm.updateSettings(settings.copy(sensitivity = it)) }
+                            onUpdateSensitivity = { vm.updateSettings(settings.copy(sensitivity = it)) },
+                            onOpenKeyboard = { vm.selectTab(MainNavigationTab.KEYBOARD) }
                         )
                     }
 
@@ -264,7 +288,10 @@ fun CutPilotApp(
                             onPhysicalKey = vm::sendPhysicalKey,
                             onTypeText = vm::typeText,
                             onMedia = vm::sendMedia,
-                            onShortcut = vm::triggerLibraryShortcut
+                            onShortcut = vm::triggerLibraryShortcut,
+                            landscape = settings.keyboardLandscape,
+                            onToggleLandscape = { vm.setKeyboardLandscape(!settings.keyboardLandscape) },
+                            onOpenTrackpad = { vm.selectTab(MainNavigationTab.TRACKPAD) }
                         )
                     }
 

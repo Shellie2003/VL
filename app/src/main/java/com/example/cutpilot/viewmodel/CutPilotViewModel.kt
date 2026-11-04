@@ -112,7 +112,9 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     val latencyInfo: StateFlow<LatencyInfo> = _latencyInfo.asStateFlow()
 
     // Settings
-    private val _settings = MutableStateFlow(ControllerSettings(azertyHost = pairingStore.azertyHost))
+    private val _settings = MutableStateFlow(
+        ControllerSettings(azertyHost = pairingStore.azertyHost, keyboardLandscape = pairingStore.keyboardLandscape)
+    )
     val settings: StateFlow<ControllerSettings> = _settings.asStateFlow()
 
     // Software Profiles
@@ -317,6 +319,9 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
 
     fun updateSettings(newSettings: ControllerSettings) {
         if (newSettings.azertyHost != _settings.value.azertyHost) pairingStore.azertyHost = newSettings.azertyHost
+        if (newSettings.keyboardLandscape != _settings.value.keyboardLandscape) {
+            pairingStore.keyboardLandscape = newSettings.keyboardLandscape
+        }
         _settings.value = newSettings
     }
 
@@ -325,6 +330,11 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     // =========================================================================
     val hostLayout: HostLayout
         get() = if (_settings.value.azertyHost) HostLayout.AZERTY else HostLayout.QWERTY
+
+    fun setKeyboardLandscape(landscape: Boolean) {
+        updateSettings(_settings.value.copy(keyboardLandscape = landscape))
+        triggerHapticTick()
+    }
 
     fun setHostLayout(layout: HostLayout) {
         updateSettings(_settings.value.copy(azertyHost = layout == HostLayout.AZERTY))

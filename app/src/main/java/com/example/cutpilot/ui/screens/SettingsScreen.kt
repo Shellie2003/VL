@@ -73,10 +73,10 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "RÉGLAGES & PRÉCISION CHIRURGICALE",
+            text = "Personnalisez la souris, les gestes et le confort d'utilisation.",
             color = TextTertiary,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Normal
         )
 
         // Precision & Sensitivity Card
@@ -86,11 +86,11 @@ fun SettingsScreen(
             border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceContainerHighDark),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Mouse, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Capteur et Précision de la Souris", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Pointeur", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
 
                 // Sensitivity slider
@@ -99,7 +99,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Sensibilité standard", color = TextSecondary, fontSize = 12.sp)
+                        Text("Vitesse du curseur", color = TextSecondary, fontSize = 12.sp)
                         Text("${String.format("%.2f", settings.sensitivity)}x", color = NeonCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     Slider(
@@ -124,8 +124,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Accélération dynamique", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                        Text("Accélère les grands mouvements pour couvrir les écrans 4K/Ultra-Wide sans perdre la précision fine", color = TextSecondary, fontSize = 10.sp)
+                        Text("Accélération dynamique", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Mouvements rapides = curseur plus loin, mouvements lents = plus précis.", color = TextSecondary, fontSize = 12.sp)
                     }
                     Switch(
                         checked = settings.acceleration,
@@ -142,7 +142,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Multiplicateur Mode Sniper", color = TextSecondary, fontSize = 12.sp)
+                        Text("Vitesse en mode précision", color = TextSecondary, fontSize = 12.sp)
                         Text("${(settings.sniperMultiplier * 100).toInt()}% de vitesse", color = AmberAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     Slider(
@@ -166,11 +166,11 @@ fun SettingsScreen(
             border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceContainerHighDark),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Vibration, contentDescription = null, tint = AmberAccent, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Retours Tactiles & Haptiques", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Gestes et confort", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
 
                 Row(
@@ -179,8 +179,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Vibrations physiques", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                        Text("Retour haptique aux clics et crans de la molette Jog wheel", color = TextSecondary, fontSize = 10.sp)
+                        Text("Vibrations", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Petite vibration à chaque clic et cran de molette.", color = TextSecondary, fontSize = 12.sp)
                     }
                     Switch(
                         checked = settings.hapticFeedback,
@@ -197,8 +197,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Taper pour cliquer", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                        Text("Un simple contact sur la surface tactile génère un clic gauche", color = TextSecondary, fontSize = 10.sp)
+                        Text("Taper pour cliquer", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Toucher le trackpad fait un clic gauche.", color = TextSecondary, fontSize = 12.sp)
                     }
                     Switch(
                         checked = settings.tapToClick,
@@ -215,8 +215,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Défilement naturel", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                        Text("Le contenu suit les doigts (comme un trackpad de portable)", color = TextSecondary, fontSize = 10.sp)
+                        Text("Défilement naturel", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Le contenu suit les doigts, comme sur un portable.", color = TextSecondary, fontSize = 12.sp)
                     }
                     Switch(
                         checked = settings.naturalScroll,
@@ -233,8 +233,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Ordinateur en AZERTY (Bluetooth)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                        Text("Corrige les raccourcis A, Q, Z, W, M en mode Bluetooth HID. Inutile en Wi-Fi.", color = TextSecondary, fontSize = 10.sp)
+                        Text("Ordinateur en AZERTY", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("À activer si le clavier du PC est en AZERTY (aussi réglable dans l'écran Clavier).", color = TextSecondary, fontSize = 12.sp)
                     }
                     Switch(
                         checked = settings.azertyHost,
@@ -251,8 +251,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Garder l'écran allumé", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                        Text("Empêche la mise en veille du téléphone pendant les sessions de montage", color = TextSecondary, fontSize = 10.sp)
+                        Text("Garder l'écran allumé", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Le téléphone ne se met pas en veille pendant l'utilisation.", color = TextSecondary, fontSize = 12.sp)
                     }
                     Switch(
                         checked = settings.keepScreenAwake,
@@ -274,7 +274,7 @@ fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.BatteryFull, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Télémétrie & État de la Batterie", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Batterie du téléphone", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
 
                 Row(
@@ -290,9 +290,9 @@ fun SettingsScreen(
                             .padding(10.dp)
                     ) {
                         Column {
-                            Text("NIVEAU", color = TextTertiary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Text("Niveau", color = TextTertiary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text("${batteryInfo.percentage}%", color = EmeraldGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(if (batteryInfo.isCharging) "En charge" else "Sur batterie", color = TextSecondary, fontSize = 10.sp)
+                            Text(if (batteryInfo.isCharging) "En charge" else "Sur batterie", color = TextSecondary, fontSize = 12.sp)
                         }
                     }
 
@@ -305,9 +305,9 @@ fun SettingsScreen(
                             .padding(10.dp)
                     ) {
                         Column {
-                            Text("SANTÉ", color = TextTertiary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Text("État", color = TextTertiary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text(batteryInfo.health, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Cellules optimales", color = TextTertiary, fontSize = 9.sp)
+                            Text("", color = TextTertiary, fontSize = 11.sp)
                         }
                     }
 
@@ -320,9 +320,9 @@ fun SettingsScreen(
                             .padding(10.dp)
                     ) {
                         Column {
-                            Text("TEMPÉRATURE", color = TextTertiary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Text("Température", color = TextTertiary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text("${String.format("%.1f", batteryInfo.temperatureCelsius)}°C", color = AmberAccent, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                            Text("Refroidissement passif", color = TextTertiary, fontSize = 9.sp)
+                            Text("", color = TextTertiary, fontSize = 11.sp)
                         }
                     }
                 }
@@ -336,8 +336,8 @@ fun SettingsScreen(
                 .padding(vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Vôlavo Studio v1.0", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            Text("Architecture Bluetooth HID Native (N'exige aucun pilote hôte) • Protocole UDP Ultra-Low Latency", color = TextTertiary, fontSize = 9.sp)
+            Text("Vôlavo 1.1", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text("Bluetooth HID sans pilote · Wi-Fi faible latence", color = TextTertiary, fontSize = 11.sp)
         }
     }
 }

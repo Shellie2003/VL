@@ -38,6 +38,11 @@ tap_attr content-desc "Menu"
 shot 3-menu
 tap_attr text "Clavier"
 shot 4-clavier
+tap_attr text "Mode paysage"
+sleep 3
+shot 4b-clavier-paysage
+tap_attr content-desc "Quitter le mode paysage"
+sleep 3
 open_menu_item "Molette Jog"
 shot 5-jog
 open_menu_item "Deck de montage"

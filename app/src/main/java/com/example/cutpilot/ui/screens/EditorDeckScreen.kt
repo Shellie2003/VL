@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -105,233 +106,172 @@ fun EditorDeckScreen(
             .background(DarkBg)
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
-        // Profile Selector Bar
+        // Software profile
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "LOGICIEL ACTIF",
-                color = TextTertiary,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
-            )
-
+            Text("Logiciel", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             TextButton(
                 onClick = { showCreateProfileDialog = true },
                 modifier = Modifier.testTag("add_custom_profile_btn")
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Add, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Nouveau profil", color = NeonCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text("Nouveau profil", color = NeonCyan, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 4.dp)
+            contentPadding = PaddingValues(vertical = 2.dp)
         ) {
             items(profiles) { profile ->
                 val isSelected = profile.id == activeProfile.id
-                val borderCol = if (isSelected) NeonCyan else SurfaceContainerHighDark
-                val bgCol = if (isSelected) NeonCyan.copy(alpha = 0.15f) else SurfaceDark
-
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(bgCol)
-                        .border(1.dp, borderCol, RoundedCornerShape(12.dp))
-                        .clickable { onSelectProfile(profile) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .testTag("profile_item_${profile.id}"),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (isSelected) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(NeonCyan)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                    Text(
-                        text = profile.name,
-                        color = if (isSelected) TextPrimary else TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Category Filter Chips
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(vertical = 4.dp)
-        ) {
-            items(categories) { cat ->
                 FilterChip(
-                    selected = selectedCategory == cat,
-                    onClick = { selectedCategory = cat },
-                    label = { Text(cat, fontSize = 11.sp) },
+                    selected = isSelected,
+                    onClick = { onSelectProfile(profile) },
+                    label = { Text(profile.name, fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal) },
+                    modifier = Modifier
+                        .height(40.dp)
+                        .testTag("profile_item_${profile.id}"),
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AmberAccent.copy(alpha = 0.2f),
-                        selectedLabelColor = AmberAccent,
-                        containerColor = SurfaceContainerDark,
+                        selectedContainerColor = NeonCyan.copy(alpha = 0.18f),
+                        selectedLabelColor = TextPrimary,
+                        containerColor = SurfaceDark,
                         labelColor = TextSecondary
                     ),
                     border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
-                        selected = selectedCategory == cat,
+                        selected = isSelected,
                         borderColor = SurfaceContainerHighDark,
-                        selectedBorderColor = AmberAccent
+                        selectedBorderColor = NeonCyan
                     )
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+        Text("Catégorie", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
 
-        // Grid of Illuminated Macro Pads
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(vertical = 2.dp)
+        ) {
+            items(categories) { cat ->
+                val sel = selectedCategory == cat
+                FilterChip(
+                    selected = sel,
+                    onClick = { selectedCategory = cat },
+                    label = { Text(cat, fontSize = 13.sp) },
+                    modifier = Modifier.height(36.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = NeonCyan,
+                        selectedLabelColor = DarkBg,
+                        containerColor = SurfaceContainerDark,
+                        labelColor = TextSecondary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = sel,
+                        borderColor = Color.Transparent,
+                        selectedBorderColor = Color.Transparent
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Shortcut pads: 2 per row on a phone, big readable labels
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 100.dp),
+            columns = GridCells.Adaptive(minSize = 150.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = 16.dp),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
             items(filteredShortcuts) { shortcut ->
                 val padColor = Color(shortcut.colorHex)
-
-                Box(
+                Row(
                     modifier = Modifier
-                        .height(105.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    SurfaceContainerDark,
-                                    SurfaceDark
-                                )
-                            )
-                        )
-                        .border(1.5.dp, padColor.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
-                        .clickable { onTriggerShortcut(shortcut) }
-                        .padding(8.dp)
-                        .testTag("macro_pad_${shortcut.id}")
-                ) {
-                    // Category & Edit icon
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = shortcut.category.uppercase(),
-                            color = padColor,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        IconButton(
-                            onClick = { editingShortcut = shortcut },
-                            modifier = Modifier.size(20.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Personnaliser",
-                                tint = TextTertiary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
-                    }
-
-                    // Key Combination Badge (e.g. Ctrl + K)
-                    val modText = shortcut.modifiers.joinToString(" ") { it.name }
-                    val keyDisplay = if (modText.isNotEmpty()) "$modText + ${shortcut.keySymbol}" else shortcut.keySymbol
-
-                    Column(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(padColor.copy(alpha = 0.15f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = keyDisplay,
-                                color = padColor,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = shortcut.label,
-                            color = TextPrimary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                    }
-
-                    // Bottom subtle dot
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .size(16.dp, 2.dp)
-                            .clip(RoundedCornerShape(1.dp))
-                            .background(padColor)
-                    )
-                }
-            }
-
-            // Custom shortcut addition tile
-            item {
-                Box(
-                    modifier = Modifier
-                        .height(105.dp)
+                        .height(76.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(SurfaceDark)
                         .border(1.dp, SurfaceContainerHighDark, RoundedCornerShape(14.dp))
-                        .clickable {
-                            editingShortcut = ShortcutKey(
-                                id = "custom_${System.currentTimeMillis()}",
-                                label = "Nouveau Raccourci",
-                                category = if (selectedCategory != "Tous") selectedCategory else "Outils",
-                                keySymbol = "X",
-                                colorHex = 0xFF00E5FF
-                            )
-                        }
-                        .padding(8.dp)
-                        .testTag("add_shortcut_pad"),
-                    contentAlignment = Alignment.Center
+                        .clickable { onTriggerShortcut(shortcut) }
+                        .testTag("macro_pad_${shortcut.id}"),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Ajouter",
-                            tint = NeonCyan,
-                            modifier = Modifier.size(24.dp)
+                    // Category color accent
+                    Box(
+                        modifier = Modifier
+                            .width(4.dp)
+                            .fillMaxHeight()
+                            .background(padColor)
+                    )
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp)
+                    ) {
+                        Text(
+                            text = shortcut.label,
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Ajouter Touche",
-                            color = TextSecondary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium
+                            text = comboLabel(shortcut),
+                            color = padColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1
                         )
                     }
+                    IconButton(
+                        onClick = { editingShortcut = shortcut },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Modifier ${shortcut.label}",
+                            tint = TextTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .height(76.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, NeonCyan.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                        .clickable {
+                            editingShortcut = ShortcutKey(
+                                id = "custom_${System.currentTimeMillis()}",
+                                label = "Nouveau raccourci",
+                                category = if (selectedCategory != "Tous") selectedCategory else "Outils",
+                                keySymbol = "X",
+                                colorHex = 0xFF8B7CFF
+                            )
+                        }
+                        .testTag("add_shortcut_pad"),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Ajouter", color = NeonCyan, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -383,19 +323,19 @@ fun EditorDeckScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = hasCtrl, onCheckedChange = { hasCtrl = it })
-                            Text("Ctrl", color = TextPrimary, fontSize = 11.sp)
+                            Text("Ctrl", color = TextPrimary, fontSize = 13.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = hasShift, onCheckedChange = { hasShift = it })
-                            Text("Shift", color = TextPrimary, fontSize = 11.sp)
+                            Text("Maj", color = TextPrimary, fontSize = 13.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = hasAlt, onCheckedChange = { hasAlt = it })
-                            Text("Alt", color = TextPrimary, fontSize = 11.sp)
+                            Text("Alt", color = TextPrimary, fontSize = 13.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = hasCmd, onCheckedChange = { hasCmd = it })
-                            Text("Cmd", color = TextPrimary, fontSize = 11.sp)
+                            Text("Win", color = TextPrimary, fontSize = 13.sp)
                         }
                     }
                 }
@@ -484,4 +424,27 @@ fun EditorDeckScreen(
             containerColor = SurfaceDark
         )
     }
+}
+
+/** "Ctrl + Maj + K" style label (French key names). */
+private fun comboLabel(shortcut: ShortcutKey): String {
+    val mods = shortcut.modifiers.sortedBy { it.ordinal }.map {
+        when (it) {
+            ModifierKey.CTRL -> "Ctrl"
+            ModifierKey.SHIFT -> "Maj"
+            ModifierKey.ALT -> "Alt"
+            ModifierKey.CMD -> "Win"
+        }
+    }
+    val key = when (shortcut.keySymbol.uppercase()) {
+        "ESPACE" -> "Espace"
+        "DEL" -> "Suppr"
+        "ENTRER" -> "Entrée"
+        "HAUT" -> "↑"
+        "BAS" -> "↓"
+        "GAUCHE" -> "←"
+        "DROITE" -> "→"
+        else -> shortcut.keySymbol
+    }
+    return (mods + key).joinToString(" + ")
 }

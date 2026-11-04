@@ -27,7 +27,12 @@ class PairingStore(context: Context) {
         get() = prefs.getBoolean(KEY_AZERTY, false)
         set(value) = prefs.edit().putBoolean(KEY_AZERTY, value).apply()
 
+    var keyboardLandscape: Boolean
+        get() = prefs.getBoolean(KEY_KB_LANDSCAPE, false)
+        set(value) = prefs.edit().putBoolean(KEY_KB_LANDSCAPE, value).apply()
+
     private companion object {
+        const val KEY_KB_LANDSCAPE = "keyboard_landscape"
         const val KEY_AZERTY = "azerty_host"
         const val KEY_URI = "last_pairing_uri"
         const val KEY_BT = "last_bt_host"

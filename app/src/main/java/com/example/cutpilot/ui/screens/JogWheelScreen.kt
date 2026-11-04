@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -330,147 +331,114 @@ fun JogWheelScreen(
             }
         }
 
-        // Discrete Step Buttons (-1 Frame, +1 Frame, -1 Sec, +1 Sec)
+        // Fine steps: short single-line labels, equal widths, 48 dp targets
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Button(
-                onClick = { onJogTick(-24, false) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .testTag("jog_minus_1s"),
-                colors = ButtonDefaults.buttonColors(containerColor = SurfaceContainerDark),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("-1s (24 img)", fontSize = 11.sp, color = TextSecondary)
-            }
-
-            Button(
-                onClick = { onJogTick(-1, true) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .testTag("jog_minus_1frame"),
-                colors = ButtonDefaults.buttonColors(containerColor = SurfaceContainerHighDark),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, tint = NeonCyan)
-                Text("-1 Image", fontSize = 11.sp, color = NeonCyan, fontWeight = FontWeight.Bold)
-            }
-
-            Button(
-                onClick = { onJogTick(1, true) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .testTag("jog_plus_1frame"),
-                colors = ButtonDefaults.buttonColors(containerColor = SurfaceContainerHighDark),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("+1 Image", fontSize = 11.sp, color = NeonCyan, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = NeonCyan)
-            }
-
-            Button(
-                onClick = { onJogTick(24, false) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp)
-                    .testTag("jog_plus_1s"),
-                colors = ButtonDefaults.buttonColors(containerColor = SurfaceContainerDark),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("+1s (24 img)", fontSize = 11.sp, color = TextSecondary)
-            }
+            StepButton("−1 s", "jog_minus_1s", emphasized = false, Modifier.weight(1f)) { onJogTick(-24, false) }
+            StepButton("−1 img", "jog_minus_1frame", emphasized = true, Modifier.weight(1f)) { onJogTick(-1, true) }
+            StepButton("+1 img", "jog_plus_1frame", emphasized = true, Modifier.weight(1f)) { onJogTick(1, true) }
+            StepButton("+1 s", "jog_plus_1s", emphasized = false, Modifier.weight(1f)) { onJogTick(24, false) }
         }
 
-        // Shuttle J-K-L Controls and Markers (In, Out, Razor)
+        // Transport J · K · L
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(SurfaceDark)
-                .border(1.dp, SurfaceContainerHighDark, RoundedCornerShape(16.dp))
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Mark IN (I)
-            OutlinedButton(
-                onClick = onMarkIn,
-                modifier = Modifier.height(46.dp),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Icon(Icons.Default.BookmarkBorder, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("IN (I)", color = EmeraldGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-            }
-
-            // Shuttle Reverse (J)
             IconButton(
                 onClick = onShuttleReverse,
                 modifier = Modifier
-                    .size(46.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
                     .background(SurfaceContainerDark)
             ) {
-                Icon(Icons.Default.FastRewind, contentDescription = "Navette Arrière (J)", tint = TextPrimary)
+                Icon(Icons.Default.FastRewind, contentDescription = "Navette arrière (J)", tint = TextPrimary)
             }
-
-            // Play / Pause (K / Espace)
             IconButton(
                 onClick = onTogglePlayPause,
                 modifier = Modifier
-                    .size(54.dp)
+                    .size(64.dp)
                     .clip(CircleShape)
-                    .background(if (isPlaying) EmeraldGreen.copy(alpha = 0.3f) else NeonCyan.copy(alpha = 0.2f))
+                    .background(if (isPlaying) EmeraldGreen.copy(alpha = 0.25f) else NeonCyan.copy(alpha = 0.18f))
                     .border(2.dp, if (isPlaying) EmeraldGreen else NeonCyan, CircleShape)
                     .testTag("jog_play_pause")
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = "Lecture / Pause",
+                    contentDescription = if (isPlaying) "Pause" else "Lecture",
                     tint = if (isPlaying) EmeraldGreen else NeonCyan,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(32.dp)
                 )
             }
-
-            // Shuttle Forward (L)
             IconButton(
                 onClick = onShuttleForward,
                 modifier = Modifier
-                    .size(46.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
                     .background(SurfaceContainerDark)
             ) {
-                Icon(Icons.Default.FastForward, contentDescription = "Navette Avant (L)", tint = TextPrimary)
-            }
-
-            // Mark OUT (O)
-            OutlinedButton(
-                onClick = onMarkOut,
-                modifier = Modifier.height(46.dp),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Icon(Icons.Default.Bookmark, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("OUT (O)", color = EmeraldGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-            }
-
-            // Razor Cut Instant Split
-            IconButton(
-                onClick = onQuickCut,
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(RazorRed.copy(alpha = 0.2f))
-                    .border(1.dp, RazorRed, CircleShape)
-                    .testTag("jog_razor_cut_btn")
-            ) {
-                Icon(Icons.Default.ContentCut, contentDescription = "Coupe immédiate", tint = RazorRed, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.FastForward, contentDescription = "Navette avant (L)", tint = TextPrimary)
             }
         }
+
+        // Markers and cut: three equal, labelled buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ActionButton("Point IN", Icons.Default.BookmarkBorder, EmeraldGreen, "jog_mark_in", Modifier.weight(1f), onMarkIn)
+            ActionButton("Couper", Icons.Default.ContentCut, RazorRed, "jog_razor_cut_btn", Modifier.weight(1f), onQuickCut)
+            ActionButton("Point OUT", Icons.Default.Bookmark, EmeraldGreen, "jog_mark_out", Modifier.weight(1f), onMarkOut)
+        }
+    }
+}
+
+@Composable
+private fun StepButton(label: String, tag: String, emphasized: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (emphasized) SurfaceContainerHighDark else SurfaceContainerDark)
+            .clickable(onClick = onClick)
+            .testTag(tag),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = if (emphasized) NeonCyan else TextSecondary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun ActionButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    tag: String,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .height(52.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(tint.copy(alpha = 0.12f))
+            .border(1.dp, tint.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .testTag(tag),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(label, color = tint, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1)
     }
 }

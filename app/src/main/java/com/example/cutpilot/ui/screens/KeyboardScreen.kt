@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +20,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mouse
+import androidx.compose.material.icons.filled.ScreenLockPortrait
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
@@ -31,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,12 +76,15 @@ fun KeyboardScreen(
     onTypeText: (text: String, pressEnter: Boolean) -> Unit,
     onMedia: (usage: Int) -> Unit,
     onShortcut: (LibraryShortcut) -> Unit,
+    landscape: Boolean = false,
+    onToggleLandscape: () -> Unit = {},
+    onOpenTrackpad: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Sticky modifiers: one tap = active for the next key, second tap = locked, third = off.
     var oneShot by remember { mutableIntStateOf(0) }
     var locked by remember { mutableIntStateOf(0) }
-    var text by remember { mutableStateOf("") }
+    var text by rememberSaveable { mutableStateOf("") }
     var category by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
 
@@ -102,6 +110,21 @@ fun KeyboardScreen(
         oneShot = 0
     }
 
+    if (landscape) {
+        LandscapeKeyboard(
+            layout = layout,
+            activeMods = activeMods,
+            lockedMods = locked,
+            onLayoutChange = onLayoutChange,
+            onPress = { press(it) },
+            onTypeText = onTypeText,
+            onExitLandscape = onToggleLandscape,
+            onOpenTrackpad = onOpenTrackpad,
+            modifier = modifier
+        )
+        return
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -109,6 +132,13 @@ fun KeyboardScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 6.dp, vertical = 8.dp)
     ) {
+        // --- Quick actions: back to the trackpad, piano (landscape) mode ------
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            ToolbarPill("Trackpad", Icons.Default.Mouse, Modifier.weight(1f).testTag("back_to_trackpad"), onOpenTrackpad)
+            ToolbarPill("Mode paysage", Icons.Default.ScreenRotation, Modifier.weight(1f).testTag("keyboard_landscape_toggle"), onToggleLandscape)
+        }
+        Spacer(Modifier.height(10.dp))
+
         // --- Layout selector -------------------------------------------------
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("Clavier de l'ordinateur :", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
@@ -380,6 +410,163 @@ private fun KeyCap(
             if (!altGr && key.altGrLabel != null) {
                 Text(key.altGrLabel, color = TextTertiary, fontSize = 8.sp, maxLines = 1)
             }
+        }
+    }
+}
+
+@Composable
+private fun ToolbarPill(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceContainerDark)
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+/**
+ * "Piano" mode: phone held sideways, the keyboard uses the full width with the same
+ * arrangement as a real keyboard (main block on the left, navigation + arrows on the right).
+ */
+@Composable
+private fun LandscapeKeyboard(
+    layout: HostLayout,
+    activeMods: Int,
+    lockedMods: Int,
+    onLayoutChange: (HostLayout) -> Unit,
+    onPress: (VirtualKey) -> Unit,
+    onTypeText: (String, Boolean) -> Unit,
+    onExitLandscape: () -> Unit,
+    onOpenTrackpad: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showTextDialog by remember { mutableStateOf(false) }
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(DarkBg)
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+    ) {
+        // Slim toolbar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            SmallTool(Icons.Default.Mouse, "Trackpad", onOpenTrackpad)
+            HostLayout.entries.forEach { l ->
+                val sel = l == layout
+                Box(
+                    modifier = Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (sel) NeonCyan else SurfaceContainerDark)
+                        .clickable { onLayoutChange(l) }
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(l.label, color = if (sel) DarkBg else TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Text(
+                text = if (activeMods != 0) modifierNames(activeMods) else "",
+                color = AmberAccent,
+                fontSize = 12.sp,
+                modifier = Modifier.weight(1f),
+                maxLines = 1
+            )
+            SmallTool(Icons.Default.Send, "Envoyer du texte") { showTextDialog = true }
+            SmallTool(Icons.Default.ScreenLockPortrait, "Quitter le mode paysage", onExitLandscape)
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Main block: function row + 5 rows
+            Column(modifier = Modifier.weight(3.4f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                FillRow(KeyboardLayouts.functionRow, activeMods, lockedMods, layout, Modifier.weight(0.75f), onPress)
+                KeyboardLayouts.rows(layout).forEach { row ->
+                    FillRow(row, activeMods, lockedMods, layout, Modifier.weight(1f), onPress)
+                }
+            }
+            // Right block: navigation cluster on top, inverted-T arrows at the bottom
+            Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                val nav = KeyboardLayouts.navigationKeys // Impr, Inser, Début, Pg↑, Suppr, Fin, Pg↓
+                FillRow(listOf(nav[0]), activeMods, lockedMods, layout, Modifier.weight(0.75f), onPress)
+                FillRow(listOf(nav[1], nav[2], nav[3]), activeMods, lockedMods, layout, Modifier.weight(1f), onPress)
+                FillRow(listOf(nav[4], nav[5], nav[6]), activeMods, lockedMods, layout, Modifier.weight(1f), onPress)
+                Spacer(Modifier.weight(1f))
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Spacer(Modifier.weight(1f))
+                    KeyCap(KeyboardLayouts.arrowUp, activeMods, layout, Modifier.weight(1f).fillMaxHeight(), lockedMods, onPress)
+                    Spacer(Modifier.weight(1f))
+                }
+                FillRow(
+                    listOf(KeyboardLayouts.arrowLeft, KeyboardLayouts.arrowDown, KeyboardLayouts.arrowRight),
+                    activeMods, lockedMods, layout, Modifier.weight(1f), onPress
+                )
+            }
+        }
+    }
+
+    if (showTextDialog) {
+        var text by rememberSaveable { mutableStateOf("") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showTextDialog = false },
+            title = { Text("Envoyer du texte") },
+            text = {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    placeholder = { Text("Texte à taper sur l'ordinateur…") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onTypeText(text, false); showTextDialog = false },
+                    enabled = text.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkBg)
+                ) { Text("Envoyer") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { onTypeText(text, true); showTextDialog = false }) {
+                    Text("Envoyer + Entrée", color = NeonCyan)
+                }
+            },
+            containerColor = SurfaceDark
+        )
+    }
+}
+
+@Composable
+private fun SmallTool(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) {
+    androidx.compose.material3.IconButton(onClick = onClick, modifier = Modifier.size(40.dp)) {
+        Icon(icon, contentDescription = description, tint = NeonCyan, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun FillRow(
+    keys: List<VirtualKey>,
+    activeMods: Int,
+    lockedMods: Int,
+    layout: HostLayout,
+    modifier: Modifier,
+    onPress: (VirtualKey) -> Unit
+) {
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        keys.forEach { k ->
+            KeyCap(k, activeMods, layout, Modifier.weight(k.weight).fillMaxHeight(), lockedMods, onPress)
         }
     }
 }

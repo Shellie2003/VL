@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
@@ -93,6 +94,7 @@ fun TrackpadScreen(
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onUpdateSensitivity: (Float) -> Unit,
+    onOpenKeyboard: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // touchPos is only read inside the Canvas draw lambda: moving a finger invalidates the
@@ -123,24 +125,28 @@ fun TrackpadScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Profil", color = TextTertiary, fontSize = 11.sp)
-                Text(
-                    text = activeProfileName,
-                    color = TextPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
+            // Keyboard: one tap from the trackpad
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(NeonCyan.copy(alpha = 0.16f))
+                    .clickable(onClick = onOpenKeyboard)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .testTag("open_keyboard_button"),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Keyboard, contentDescription = null, tint = NeonCyan, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Clavier", color = NeonCyan, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
+            Spacer(modifier = Modifier.weight(1f))
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                 // Razor Cut quick trigger
                 IconButton(
                     onClick = onQuickCut,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
                         .background(RazorRed.copy(alpha = 0.15f))
                         .testTag("quick_cut_btn")
@@ -157,7 +163,7 @@ fun TrackpadScreen(
                 IconButton(
                     onClick = onTogglePlayPause,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
                         .background(if (isPlaying) EmeraldGreen.copy(alpha = 0.25f) else SurfaceContainerHighDark)
                         .testTag("quick_play_pause_btn")
@@ -173,7 +179,7 @@ fun TrackpadScreen(
                 // Zoom Out
                 IconButton(
                     onClick = onZoomOut,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ZoomOut,
@@ -186,7 +192,7 @@ fun TrackpadScreen(
                 // Zoom In
                 IconButton(
                     onClick = onZoomIn,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ZoomIn,
@@ -199,7 +205,7 @@ fun TrackpadScreen(
                 // Undo
                 IconButton(
                     onClick = onQuickUndo,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Undo,
