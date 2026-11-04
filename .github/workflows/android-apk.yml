@@ -12,6 +12,9 @@ concurrency:
   group: apk-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,23 +38,27 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
-      # Clé de signature FIXE : chaque nouvel APK peut s'installer par-dessus le précédent.
-      - name: Clé de signature debug
+      # Clés FIXES : chaque nouvel APK s'installe par-dessus le précédent.
+      - name: Clés de signature
         run: cp ci/volavo-debug.keystore debug.keystore
 
-      - name: Compiler l'APK
-        run: gradle :app:assembleDebug --stacktrace --no-configuration-cache
+      - name: Compiler l'APK (release)
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/ci/volavo-release.keystore
+          STORE_PASSWORD: volavo-ci
+          KEY_PASSWORD: volavo-ci
+        run: gradle :app:assembleRelease --stacktrace --no-configuration-cache
 
       - name: Signer (v1 + v2 + v3) et vérifier l'APK
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           mkdir -p dist
           # Signature v1 forcée : certains installateurs constructeurs (MIUI) l'exigent.
-          "$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android \
-            --ks-key-alias androiddebugkey --key-pass pass:android \
+          "$BT/apksigner" sign --ks ci/volavo-release.keystore --ks-pass pass:volavo-ci \
+            --ks-key-alias upload --key-pass pass:volavo-ci \
             --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
             --min-sdk-version 24 \
-            --out dist/Volavo.apk app/build/outputs/apk/debug/app-debug.apk
+            --out dist/Volavo.apk app/build/outputs/apk/release/app-release.apk
           "$BT/apksigner" verify --verbose --print-certs dist/Volavo.apk | grep -E "Verified using|certificate DN"
           # Vérifie la v1 comme un ancien installateur (min-sdk 21) le ferait.
           "$BT/apksigner" verify --verbose --min-sdk-version 21 dist/Volavo.apk | tee verify.log | grep "v1 scheme"
@@ -59,12 +66,27 @@ jobs:
           unzip -l dist/Volavo.apk | grep -E "META-INF/.*\.(SF|RSA)"
           "$BT/aapt2" dump badging dist/Volavo.apk | grep -E "^package|SdkVersion|targetSdk|testOnly|native-code|launchable" || true
           if "$BT/aapt2" dump badging dist/Volavo.apk | grep -q "testOnly"; then echo "::error::APK marqué testOnly"; exit 1; fi
+          sha256sum dist/Volavo.apk
 
       - name: Publier l'APK
         uses: actions/upload-artifact@v4
         with:
           name: Volavo-APK
           path: dist/Volavo.apk
+
+      # Lien de téléchargement direct (un .apk, pas un zip, sans compte GitHub)
+      - name: Publier en Release GitHub
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: "Vôlavo — dernier APK Android"
+          prerelease: false
+          make_latest: true
+          files: dist/Volavo.apk
+          body: |
+            Téléchargez **Volavo.apk** ci-dessous et ouvrez-le sur le téléphone.
+            Compilé depuis ${{ github.sha }}.
           if-no-files-found: error
 
   # Installe réellement l'APK sur un émulateur et lance l'app : donne le code
