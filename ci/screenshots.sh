@@ -19,7 +19,7 @@ adb shell settings put global hide_error_dialogs 1 > /dev/null 2>&1
 dismiss_system_dialogs() {
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
   adb pull /sdcard/ui.xml ui.xml > /dev/null 2>&1
-  if grep -q "isn't responding\|ne répond pas" ui.xml; then
+  if grep -q "responding\|ne répond pas" ui.xml; then
     tap_attr text "Wait" || tap_attr text "Close app"
     sleep 1
   fi
