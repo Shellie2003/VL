@@ -40,6 +40,8 @@ tap_attr text "Clavier"
 shot 4-clavier
 tap_attr text "Mode paysage"
 sleep 3
+tap_attr text "Got it" || tap_attr text "OK"
+sleep 1
 shot 4b-clavier-paysage
 tap_attr content-desc "Quitter le mode paysage"
 sleep 3
