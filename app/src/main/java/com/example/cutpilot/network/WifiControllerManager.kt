@@ -433,6 +433,29 @@ class WifiControllerManager(context: Context) : InputSink {
         }
     }
 
+    // --- MIDI (FL Studio & co. through Vôlavo Hôte) ----------------------------
+    // Every MIDI message goes through the single sender thread, so the order is always
+    // preserved (a note played right before a bend never arrives after it). Pitch bend runs
+    // at touch rate (≤ 240 msg/s, 4 bytes each): no coalescing needed.
+
+    /** One complete MIDI channel message (note on/off, CC, pitch bend…). */
+    fun midi(message: ByteArray) {
+        if (!ready || message.isEmpty()) return
+        val copy = message.copyOf()
+        post {
+            val n = copy.size.coerceAtMost(txBuf.size - 1)
+            txBuf[0] = VolavoProtocol.T_MIDI
+            System.arraycopy(copy, 0, txBuf, 1, n)
+            transmit(1 + n)
+        }
+    }
+
+    /** Pitch bend, 14-bit value 0..16383 (8192 = centre). */
+    fun midiPitchBend(channel: Int, value14: Int) {
+        val v = value14.coerceIn(0, 16383)
+        midi(byteArrayOf((0xE0 or (channel and 0x0F)).toByte(), (v and 0x7F).toByte(), ((v shr 7) and 0x7F).toByte()))
+    }
+
     private fun post(task: Runnable) {
         try {
             sender.execute(task)

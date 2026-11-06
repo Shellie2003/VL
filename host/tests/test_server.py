@@ -39,11 +39,30 @@ def wait_for(pred, timeout=1.0):
     return False
 
 
+class FakeMidi:
+    def __init__(self):
+        self.sent = []
+        self.panics = 0
+        self._tried = False
+        self.description = "fake"
+
+    def send(self, data):
+        from midi_out import split_messages
+        self.sent.extend(split_messages(data))
+
+    def all_notes_off(self):
+        self.panics += 1
+
+    def close(self):
+        pass
+
+
 class ServerTest(unittest.TestCase):
     def setUp(self):
         self.key = P.new_key()
         self.inj = DryRunInjector(log=None)
-        self.server = VolavoServer(0, self.key, self.inj, log=lambda *_: None)
+        self.midi = FakeMidi()
+        self.server = VolavoServer(0, self.key, self.inj, log=lambda *_: None, midi=self.midi)
         self.port = self.server.sock.getsockname()[1]
         self.server.start()
         self.phone = FakePhone(self.port)
@@ -105,6 +124,19 @@ class ServerTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: len(self.inj.events) >= len(expected)))
         self.assertEqual(self.inj.events, expected)
 
+    def test_midi_forwarding_and_panic(self):
+        self.phone.hello(self.key)
+        # note on C4, pitch bend up, CC1, program change (2 bytes) in one packet, then note off
+        self.phone.send(bytes([P.T_MIDI, 0x90, 60, 100, 0xE0, 0x7F, 0x7F, 0xB0, 1, 64, 0xC0, 5]))
+        self.phone.send(bytes([P.T_MIDI, 0x80, 60, 0]))
+        self.assertTrue(wait_for(lambda: len(self.midi.sent) >= 5))
+        self.assertEqual(self.midi.sent, [
+            bytes([0x90, 60, 100]), bytes([0xE0, 0x7F, 0x7F]), bytes([0xB0, 1, 64]),
+            bytes([0xC0, 5]), bytes([0x80, 60, 0]),
+        ])
+        self.phone.send(bytes([P.T_BYE]))
+        self.assertTrue(wait_for(lambda: self.midi.panics >= 1))
+
     def test_held_state_released_on_bye(self):
         self.phone.hello(self.key)
         self.phone.send(bytes([P.T_BUTTONS, P.BTN_RIGHT]))
@@ -121,6 +153,13 @@ class ServerTest(unittest.TestCase):
         self.assertIsNone(self.server.client)
         self.phone.send(bytes([P.T_MOVE]) + P.S_MOVE.pack(1, 1))
         self.assertEqual(self.phone.recv(), bytes([P.T_NEED_AUTH]))
+
+
+class MidiSplitTest(unittest.TestCase):
+    def test_split(self):
+        from midi_out import split_messages
+        self.assertEqual(split_messages(bytes([0x91, 64, 1, 0x40, 0xD0, 9, 0x80, 1])),
+                         [bytes([0x91, 64, 1]), bytes([0xD0, 9])])
 
 
 class InjectorTest(unittest.TestCase):

@@ -51,6 +51,7 @@ import com.example.cutpilot.ui.screens.EditorDeckScreen
 import com.example.cutpilot.ui.screens.HostCompanionScreen
 import com.example.cutpilot.ui.screens.JogWheelScreen
 import com.example.cutpilot.ui.screens.KeyboardScreen
+import com.example.cutpilot.ui.screens.MidiScreen
 import com.example.cutpilot.input.HostLayout
 import com.example.cutpilot.ui.screens.SettingsScreen
 import com.example.cutpilot.ui.screens.TrackpadScreen
@@ -83,7 +84,8 @@ class MainActivity : ComponentActivity() {
 
                 // Keyboard "piano" mode: landscape + full screen, only on the keyboard screen
                 val tab by vm.currentTab.collectAsStateWithLifecycle()
-                val pianoMode = tab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape
+                val pianoMode = (tab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape) ||
+                    tab == MainNavigationTab.MIDI
                 LaunchedEffect(pianoMode) {
                     requestedOrientation = if (pianoMode) {
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -204,7 +206,9 @@ fun CutPilotApp(
             .background(DarkBg),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            if (!(currentTab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape)) VolavoTopBar(
+            if (!(currentTab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape) &&
+                currentTab != MainNavigationTab.MIDI
+            ) VolavoTopBar(
                 currentTab = currentTab,
                 connectionMode = connectionMode,
                 connectionStatus = connectionStatus,
@@ -226,7 +230,8 @@ fun CutPilotApp(
             val connectionError by vm.connectionError.collectAsStateWithLifecycle()
             val showBanner = connectionMode != ConnectionMode.SIMULATOR &&
                 currentTab != MainNavigationTab.CONNECTION && currentTab != MainNavigationTab.SETTINGS &&
-                !(currentTab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape)
+                !(currentTab == MainNavigationTab.KEYBOARD && settings.keyboardLandscape) &&
+                currentTab != MainNavigationTab.MIDI
             Column(Modifier.fillMaxSize()) {
             if (showBanner) {
                 ConnectionBanner(
@@ -291,6 +296,23 @@ fun CutPilotApp(
                             onShortcut = vm::triggerLibraryShortcut,
                             landscape = settings.keyboardLandscape,
                             onToggleLandscape = { vm.setKeyboardLandscape(!settings.keyboardLandscape) },
+                            onOpenTrackpad = { vm.selectTab(MainNavigationTab.TRACKPAD) }
+                        )
+                    }
+
+                    MainNavigationTab.MIDI -> {
+                        val route by vm.midiRoute.collectAsStateWithLifecycle()
+                        val label by vm.midiOutputLabel.collectAsStateWithLifecycle()
+                        MidiScreen(
+                            route = route,
+                            outputLabel = label,
+                            onNoteOn = vm::midiNoteOn,
+                            onNoteOff = vm::midiNoteOff,
+                            onPitchBend = vm::midiPitchBend,
+                            onModulation = vm::midiModulation,
+                            onSustain = vm::midiSustain,
+                            onPanic = vm::midiPanic,
+                            onRescanUsb = vm::midiRescan,
                             onOpenTrackpad = { vm.selectTab(MainNavigationTab.TRACKPAD) }
                         )
                     }

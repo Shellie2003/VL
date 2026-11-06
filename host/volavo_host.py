@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import volavo_protocol as P  # noqa: E402
 from injectors import create_injector  # noqa: E402
+from midi_out import MidiOut  # noqa: E402
 
 APP_NAME = "Vôlavo Hôte"
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".volavo_host.json")
@@ -119,11 +120,12 @@ def get_bluetooth_mac():
 # UDP server
 # =============================================================================
 class VolavoServer:
-    def __init__(self, port, key, injector, log=print):
+    def __init__(self, port, key, injector, log=print, midi=None):
         self.port = port
         self.key = key
         self.injector = injector
         self.log = log
+        self.midi = midi if midi is not None else MidiOut(log)
         self.client = None
         self.client_name = None
         self.last_seen = 0.0
@@ -156,6 +158,7 @@ class VolavoServer:
     def stop(self):
         self._running = False
         self._drop_client("arrêt")
+        self.midi.close()
         try:
             self.sock.close()
         except OSError:
@@ -184,6 +187,7 @@ class VolavoServer:
             self.injector.release_all()
         except Exception as exc:  # noqa: BLE001
             self.log("release_all: %s" % exc)
+        self.midi.all_notes_off()
 
     def _send(self, data, addr):
         try:
@@ -264,6 +268,8 @@ class VolavoServer:
                     inj.key(mods, usage, action, physical=True)
                 elif t == P.T_TEXT:
                     inj.text(data[1:].decode("utf-8", "replace"))
+                elif t == P.T_MIDI and len(data) >= 2:
+                    self.midi.send(data[1:])
                 elif t == P.T_MEDIA and len(data) >= 3:
                     inj.media(P.S_U16.unpack_from(data, 1)[0])
                 elif t == P.T_PING:
@@ -402,6 +408,8 @@ class HostWindow:
             lines.append("Bluetooth : %s" % self.app.bt_mac)
         if st["client"]:
             lines.append("%d paquets/s • moteur %s" % (st["rate"], self.app.injector.name))
+        if self.app.server.midi._tried:
+            lines.append("MIDI : %s" % self.app.server.midi.description)
         self.details.config(text="\n".join(lines))
         self.root.after(300, self._tick)
 

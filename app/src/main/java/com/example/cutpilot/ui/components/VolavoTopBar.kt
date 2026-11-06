@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mouse
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Piano
 import androidx.compose.material.icons.filled.RotateRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SyncProblem
@@ -87,6 +88,7 @@ data class Destination(
 val Destinations = listOf(
     Destination(MainNavigationTab.TRACKPAD, "Trackpad", "Souris tactile", Icons.Default.Mouse, 0),
     Destination(MainNavigationTab.KEYBOARD, "Clavier", "AZERTY / QWERTY, texte, raccourcis", Icons.Default.Keyboard, 0),
+    Destination(MainNavigationTab.MIDI, "Clavier MIDI", "Piano pour FL Studio, pitch bend", Icons.Default.Piano, 0),
     Destination(MainNavigationTab.JOG_WHEEL, "Molette Jog", "Timeline image par image", Icons.Default.RotateRight, 0),
     Destination(MainNavigationTab.DECK, "Deck de montage", "Premiere, DaVinci, Final Cut…", Icons.Default.Dashboard, 0),
     Destination(MainNavigationTab.CANVA, "Canva", "Outils de design Canva", Icons.Default.Palette, 0),

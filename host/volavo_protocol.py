@@ -14,6 +14,7 @@ Phone -> host
                 (interpreted by the computer's own layout: AZERTY, QWERTY…)
   0x09 TEXT     UTF-8 text to type as-is (any character, accents, emoji)
   0x0A MEDIA    u16 HID consumer usage (volume, play/pause, next…)
+  0x0B MIDI     raw MIDI channel messages (note on/off, pitch bend, CC…) for the DAW
 
 Host -> phone
   0x81 HELLO_ACK  u8 status (0 ok, 1 bad key, 2 bad version), UTF-8 host name
@@ -40,6 +41,7 @@ T_BYE = 0x07
 T_KEY_PHYS = 0x08
 T_TEXT = 0x09
 T_MEDIA = 0x0A
+T_MIDI = 0x0B
 
 T_HELLO_ACK = 0x81
 T_PONG = 0x86

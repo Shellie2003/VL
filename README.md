@@ -31,6 +31,17 @@ souris + clavier Bluetooth.
   toucher puis glisser = sélectionner / déplacer). Restent « Maintenir le clic » (glisser sur plusieurs
   mouvements) et « Clic droit ».
 
+## Clavier MIDI (FL Studio et autres DAW)
+
+Menu ☰ › **Clavier MIDI** : piano multi-touch en paysage (1 à 3 octaves, glissando), vélocité selon
+l'endroit où la touche est frappée, **pitch bend** (bande « Bend » qui revient au centre), modulation (CC1),
+sustain (CC64). Aucune note ne reste bloquée (tout est relâché en quittant l'écran ou à la déconnexion).
+
+* **USB (recommandé, ~1–3 ms, sans pilote)** : câble USB, notification Android « Chargement via USB » › **MIDI**.
+  Dans FL Studio › Options › MIDI settings, activez le téléphone dans *Input*.
+* **Wi-Fi (~3–10 ms)** : installez une fois **loopMIDI** (gratuit) sur le PC ; Vôlavo Hôte crée le port
+  « Volavo MIDI » à activer dans FL Studio.
+
 ## Onglet Clavier
 
 * Clavier complet **AZERTY ou QWERTY** (au choix, selon le clavier de l'ordinateur ; le choix est mémorisé) :

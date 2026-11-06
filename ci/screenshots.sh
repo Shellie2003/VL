@@ -45,6 +45,12 @@ sleep 1
 shot 4b-clavier-paysage
 tap_attr content-desc "Quitter le mode paysage"
 sleep 3
+open_menu_item "Clavier MIDI"
+sleep 3
+tap_attr text "Got it" > /dev/null 2>&1 || true
+shot 4c-midi
+adb shell input keyevent KEYCODE_BACK
+sleep 3
 open_menu_item "Molette Jog"
 shot 5-jog
 open_menu_item "Deck de montage"

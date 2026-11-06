@@ -13,6 +13,9 @@ import com.example.cutpilot.data.LibraryShortcut
 import com.example.cutpilot.input.HostLayout
 import com.example.cutpilot.input.InputSink
 import com.example.cutpilot.input.KeyboardLayouts
+import com.example.cutpilot.midi.MidiController
+import com.example.cutpilot.midi.MidiRoute
+import com.example.cutpilot.midi.UsbMidiOutput
 import com.example.cutpilot.input.PointerProcessor
 import com.example.cutpilot.network.PairingInfo
 import com.example.cutpilot.network.VolavoProtocol
@@ -74,6 +77,8 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     private val haptic = HapticHelper(application)
     private val pairingStore = PairingStore(application)
     private val pointer = PointerProcessor()
+    private val usbMidi = UsbMidiOutput(application)
+    private val midi = MidiController(usbMidi, wifiController)
     private val deviceName: String = (Build.MODEL ?: "Android").take(40)
 
     // Navigation & Connection
@@ -134,6 +139,12 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     private var playbackJob: Job? = null
     private var buttonMask = 0
 
+    // MIDI keyboard: current output (USB link > Wi-Fi host > none), refreshed when either changes
+    private val _midiRoute = MutableStateFlow(MidiRoute.NONE)
+    val midiRoute: StateFlow<MidiRoute> = _midiRoute.asStateFlow()
+    private val _midiOutputLabel = MutableStateFlow("Aucune sortie")
+    val midiOutputLabel: StateFlow<String> = _midiOutputLabel.asStateFlow()
+
     init {
         batteryMonitor.startListening()
         bluetoothHid.initialize()
@@ -189,7 +200,41 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
+        viewModelScope.launch {
+            combine(usbMidi.deviceName, wifiController.status, wifiController.hostName) { usbName, wifiSt, host ->
+                when {
+                    usbName != null -> MidiRoute.USB to "USB · $usbName"
+                    wifiSt == ConnectionStatus.CONNECTED -> MidiRoute.WIFI to "Wi-Fi · ${host ?: "PC"}"
+                    else -> MidiRoute.NONE to "Aucune sortie MIDI"
+                }
+            }.collect { (r, label) ->
+                _midiRoute.value = r
+                _midiOutputLabel.value = label
+            }
+        }
+
         applyConnectionMode(_connectionMode.value, autoConnect = true)
+    }
+
+    // =========================================================================
+    // MIDI keyboard (FL Studio)
+    // =========================================================================
+    fun midiNoteOn(note: Int, velocity: Int) = midi.noteOn(note, velocity)
+    fun midiNoteOff(note: Int) = midi.noteOff(note)
+    fun midiPitchBend(bend: Int) = midi.pitchBend(bend)
+    fun midiModulation(value: Int) = midi.modulation(value)
+    fun midiSustain(on: Boolean) = midi.sustain(on)
+    fun midiPanic() = midi.panic()
+
+    /** Looks for the USB MIDI link again; explains how to enable it when absent. */
+    fun midiRescan() {
+        usbMidi.scan()
+        if (_midiRoute.value == MidiRoute.NONE) {
+            _userMessages.tryEmit(
+                if (usbMidi.isSupported) "USB : choisissez « MIDI » dans la notification USB d'Android, ou connectez le PC en Wi-Fi."
+                else "Ce téléphone n'a pas le MIDI USB : connectez le PC en Wi-Fi (Vôlavo Hôte + loopMIDI)."
+            )
+        }
     }
 
     fun selectTab(tab: MainNavigationTab) {
@@ -730,6 +775,8 @@ class CutPilotViewModel(application: Application) : AndroidViewModel(application
     override fun onCleared() {
         super.onCleared()
         releaseAllInputs()
+        midi.panic()
+        usbMidi.release()
         batteryMonitor.stopListening()
         bluetoothHid.release()
         wifiController.close()

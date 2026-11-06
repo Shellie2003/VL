@@ -18,6 +18,7 @@ object VolavoProtocol {
     const val T_KEY_PHYS: Byte = 0x08
     const val T_TEXT: Byte = 0x09
     const val T_MEDIA: Byte = 0x0A
+    const val T_MIDI: Byte = 0x0B
 
     const val T_HELLO_ACK: Byte = 0x81.toByte()
     const val T_PONG: Byte = 0x86.toByte()
